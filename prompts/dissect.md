@@ -1,13 +1,14 @@
 # Abelian adversary prompt template (dissect-style)
 
-This is the prompt template Abelian's `drivers/codex-cli/abelian.sh` injects
-into `codex exec` (or any LLM dispatch) for the adversary step. It implements
-the dissect-skill methodology in standalone-prompt form — no Claude Code
-`Skill('dissect')` dependency.
+This is the prompt template Abelian's adversary subagent receives in the
+codex CLI / generic-LLM path. It implements the dissect-skill methodology
+in standalone-prompt form — no Claude Code `Skill('dissect')` dependency.
 
-The driver substitutes the placeholders below, then sends the full prompt
-verbatim to the adversary subagent. Placeholders are wrapped in `{{...}}`
-to make sed / python-format substitution simple.
+The orchestrator (codex CLI primary path = the codex session itself;
+Claude Code primary path = the Claude session via `Skill('dissect')`)
+substitutes the `{{...}}` placeholders below, then sends the prompt
+verbatim to the adversary subagent (a fresh `codex exec` subprocess or
+`Agent(general-purpose)` call respectively).
 
 ---
 

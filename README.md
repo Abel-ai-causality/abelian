@@ -2,24 +2,25 @@
 
 > Mutate. Attack. Keep what survives.
 >
-> A symmetric iteration loop for code: verification (one-way) or discovery (peer-attack).
+> A symmetric iteration loop for code: **co-research by default** (two peers each propose + challenge), unilateral as opt-in for known-target verification.
 >
 > File-gated, drift-checked, anti-compaction.
 
-[![Version](https://img.shields.io/badge/version-2.9.0-blue.svg)](https://github.com/cauchyturing/abelian/releases)
+[![Version](https://img.shields.io/badge/version-2.10.0-blue.svg)](https://github.com/cauchyturing/abelian/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Drivers](https://img.shields.io/badge/drivers-Claude%20Code%20%7C%20Codex%20CLI-orange.svg)](#install)
 
-Abelian is a [Claude Code](https://claude.com/claude-code) skill that turns any LLM session into a disciplined iteration loop. You hand it a `program.md` defining what to optimize, a deterministic `Eval`, and a `Strategy`. It mutates, evaluates, attacks, and keeps only what survives — round after round — with structural gates that compaction, fabrication, or drift cannot silently slip past.
+Abelian is an iteration loop spec consumed directly by LLM agent harnesses ([Claude Code](https://claude.com/claude-code) / OpenAI [Codex CLI](https://github.com/openai/codex) / others). You hand it a `program.md` defining what to optimize, a deterministic `Eval`, and a `Strategy`. The harness mutates, evaluates, attacks, and keeps only what survives — round after round — with structural gates that compaction, fabrication, or drift cannot silently slip past.
 
 ```
 ═══════════════════════════════════════════════════════════════
-  Round 4 / 10 — cell: memoization
+  Round 4 — cell: memoization (peer-A: dict-cache / peer-B: lazy-init)
 ═══════════════════════════════════════════════════════════════
-  Mutate     → diff +18 / -3
-  Eval       → 2.34 → 0.41 (5.7× speedup)
-  Adversary  → 1 attack: edge-case empty list panics
-  Verify     → regression test added, re-eval 0.43
+  Mutate     → peer-A diff +18 / -3, peer-B diff +24 / -7
+  Eval       → A: 2.34 → 0.41 (5.7×), B: 2.34 → 0.38 (6.2×)
+  Cross-attack → peer-A finds B's edge-case panic on empty list
+                 peer-B finds A's race condition under concurrent calls
+  Champion   → B (better eval), with A's empty-list test added
   Confirm    → ✓ 7-check commit-gate passed
   Commit     → def5678
 ═══════════════════════════════════════════════════════════════
@@ -35,23 +36,23 @@ Long-running iteration loops fail in three predictable ways:
 
 Abelian makes structural bets against all three:
 
-- **Two distinct modes**, picked by phase. *Unilateral* (mutator + adversary) for verification of a known target. *Co-research* (two peers each propose AND challenge) for discovery and novel design — symmetric peer-attack is the abelian-group property the name borrows from.
+- **Co-research by default**, unilateral by opt-in. Two peers each propose AND challenge each other's mutations, with mutual inspiration between rounds — symmetric peer-attack is the abelian-group property the name borrows from. Empirically validated 2026-04-26: same-family-different-context beats different-family-same-context for substantive co-research; cost is 2× per round but ~1.5× fewer rounds for non-trivial work.
 - **File-gated everything.** Adversary output must land on disk with a verified header block (run_id + nonce + timestamp). The commit gate checks 7 conditions; any miss = revert. A compacted agent that "forgot" it skipped the adversary cannot silently fabricate the file — the nonce isn't in its memory.
 - **Drift detection before every write.** `expected_head` + branch + dirty-tree match. Mismatch = `drift-stopped`, no further writes, terminal-only summary. Adopted from [night-shift](https://github.com/ppuliu/night-shift)'s long-horizon discipline.
 - **Per-round re-read of `INVARIANTS.md`.** The 11 non-negotiable rules live in their own file. Step 0 of every round re-reads them from disk. Conversation memory drifts; the file is truth.
-- **Forbidden termination rationales.** "Diminishing returns", "time remaining", "deferred to next session", "foundation in place", "cleaner to ship" — all explicitly refused as stopping reasons. Termination is justified only by mechanism (eval ≥ target / adversary exhausted / mutual KILL deadlock / cap fired).
+- **Forbidden termination rationales.** "Diminishing returns", "time/tokens running out", "deferred to next session", "foundation in place", "cleaner to ship" — all explicitly refused as stopping reasons. **No `--rounds` cap, no `--budget` cap.** Termination is justified only by mechanism (eval ≥ target / adversary exhausted N=3 / plateau N=3 / mutual KILL N=3 / manual SIGINT).
 
 ## Two modes
 
-| | Unilateral (default) | Co-research (`--mode=co-research`) |
+| | Co-research (default) | Unilateral (`--mode=unilateral`) |
 |---|---|---|
-| Best for | Verification of known target, ship-prep, audit, regression hardening | Discovery, novel design, "where do I start", research without an obvious target |
-| Roles | Generator proposes + implements; adversary attacks | Two peers each propose AND attack the other's proposal |
-| Cost / round | 1× | 2× |
-| Termination | Goal met, adversary exhausted across attack-class checklist, or `--rounds` cap | Goal met, plateau + diversity collapse, mutual KILL deadlock, or cap |
-| Cross-model adversary | `--adversary=codex` opt-in for high stakes | `--pair=claude-opus,codex-latest` for cross-family priors |
+| Best for | Discovery, novel design, "where do I start", non-trivial work where any mutation has multiple defensible directions | Verification of known target, ship-prep, audit, regression hardening, single-axis micro-optimization |
+| Roles | Two peers each propose AND attack the other's proposal; mutual inspiration between rounds | Generator proposes + implements; adversary attacks (only — no propose, no endorse) |
+| Cost / round | 2× | 1× |
+| Termination | Goal met, plateau (N=3 no improvement + diversity collapse), mutual KILL deadlock (N=3) | Goal met, adversary exhausted across attack-class checklist (N=3 consecutive clean) |
+| Cross-family adversary | `--pair=claude,codex` (Claude Code) / sketch in codex-cli driver | `--adversary=codex` (built-in on Claude Code via MCP) |
 
-Pure Claude (no Codex) works in both modes — that's the default. Codex is opt-in for high-stakes ship-prep where model-family blind-spot risk matters.
+Pure self×self (Claude × Claude or codex × codex with different context-framing per peer) is the recommended default. Cross-family adversary (Claude + codex) is opt-in for high-stakes ship-prep where model-family blind-spot risk matters.
 
 ## How it works
 
@@ -59,18 +60,23 @@ For each round:
 
 ```
 0. Refresh   — cat INVARIANTS.md && cat state.json (rule #3, anti-compaction)
-1. Hypothesize — Strategy + state.rounds[] → ONE testable change, tagged with cell label
-2. Mutate    — pre-files snapshot (rule #5), then apply the change
-3. Evaluate  — shell command returns a number (or test-suite pass/fail)
-4. Adversary — subagent writes attack list to round-N/adversary.txt with mandatory
+1. Hypothesize — Strategy + state.rounds[] → ONE testable change per peer (co-research) or one mutation (unilateral)
+2. Mutate    — pre-files snapshot (rule #5), then apply the change(s)
+3. Evaluate  — shell command returns a number (or test-suite pass/fail) per peer's mutation
+4. Adversary — co-research: each peer attacks the other's mutation through dissect methodology;
+               unilateral: subagent runs dissect on the diff + eval output.
+               Output written to round-N/{adversary.txt | peer-A.txt + peer-B.txt} with mandatory
                ABELIAN-ADV-v1 header (rule #11) — nonce verified at commit
 5. Confirm   — 7-check commit-gate (rule #2). All pass → git commit. Any fail → revert.
-6. Place     — replace champion (or per-cell incumbent in portfolio mode)
-7. Record    — state.rounds[N] updated; History line appended
-8. Adapt     — 5 reverts → shift strategy; diversity collapse → escalate
+6. Place     — co-research: surviving best-eval mutation = round champion, loser branch preserved
+               in portfolio (failed mutations are training data for next round)
+7. Record    — state.rounds[N] updated; mutual inspiration step (each peer reads other's mutation
+               and attacks for next round's proposal)
+8. Adapt     — converge check: goal-met / adversary-exhausted N=3 / plateau N=3 / mutual KILL N=3
+               → break; otherwise next round
 ```
 
-When termination fires, the loop runs a mandatory post-campaign escalation review (asks the adversary "what was deferred?") and writes a locked-template compound doc to `docs/solutions/[category]/[goal-slug]-[date].md`. Future runs on the same target read that doc first — **each run starts where the last one ended**.
+When termination fires, the orchestrator runs a mandatory post-campaign escalation review (asks the adversary "what was deferred?") and writes a locked-template compound doc to `docs/solutions/[category]/[goal-slug]-[date].md`. Future runs on the same target read that doc first — **each run starts where the last one ended**.
 
 ## The 11 INVARIANTS
 
@@ -81,7 +87,7 @@ These rules live in `INVARIANTS.md` and are re-read at the start of every round.
 3. **Per-round refresh** — `cat INVARIANTS.md && cat state.json` from disk
 4. **Drift check** — `expected_head` + branch + dirty-tree before any commit/revert
 5. **Pre-files snapshot** — `git ls-files` inventory before mutate
-6. **Forbidden termination rationales** — 5 stopping-preferences refused as reasons
+6. **Forbidden termination rationales** — 5 stopping-preferences refused as reasons; loop runs till mechanism converge (no rounds/budget cap)
 7. **Verbatim Goal/Target/Constraints** in adversary prompts (no paraphrasing)
 8. **Self-judge discipline** — schema-grounding required; `--adversary=off` + self-judge hard-refused
 9. **Execution gate** — adversary-exhaustion alone is necessary but not sufficient
@@ -92,45 +98,40 @@ Full text in [INVARIANTS.md](INVARIANTS.md).
 
 ## Install
 
-Abelian ships **two first-class drivers**. Pick the one matching your team's primary tool. Mechanism parity is ~99%; the only difference is dispatch vocabulary.
+Two first-class drivers, both LLM-driven self-orchestration of the same `SKILL.md` spec. **No wrapper scripts** — codex CLI and Claude Code are themselves agent harnesses; they consume the spec directly.
 
-### Claude Code primary (full Claude Code skill)
+### Claude Code primary
 
 ```
 /plugin marketplace add cauchyturing/abelian
 /plugin install abelian@abelian
 ```
 
-Or clone directly:
+Or `git clone https://github.com/cauchyturing/abelian.git ~/.claude/skills/abelian`. Restart Claude Code; the skill auto-registers. Invoke: `/abelian program.md`. Details: [`drivers/claude-code/README.md`](drivers/claude-code/README.md).
 
-```bash
-git clone https://github.com/cauchyturing/abelian.git ~/.claude/skills/abelian
-```
-
-Restart Claude Code; the skill auto-registers. Invoke with `/abelian program.md`.
-Details: [`drivers/claude-code/README.md`](drivers/claude-code/README.md).
-
-### Codex CLI primary (bash driver)
+### Codex CLI primary
 
 ```bash
 git clone https://github.com/cauchyturing/abelian.git ~/abelian
 cd /your/project
-~/abelian/drivers/codex-cli/abelian.sh program.md
+codex exec -s workspace-write "$(cat ~/abelian/SKILL.md ~/abelian/INVARIANTS.md ~/abelian/prompts/dissect.md)
+
+Run abelian on program.md per the spec above. Maintain state.json under abelian/runs/<RUN_ID>/. Run till mechanism-based converge per INVARIANTS rule #6."
 ```
 
-Self×self default (codex × codex). No anthropic SDK install, no cross-family wrapper required. Details: [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md).
+Wrap in a shell function/alias if you'll run it often. Details: [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md).
 
 ### Driver compatibility matrix
 
-| Capability | Claude Code primary | Codex CLI primary |
+| | Claude Code primary | Codex CLI primary |
 |---|---|---|
-| Mutator | Claude session via `/abelian` skill | `codex exec -s workspace-write` per round |
-| Adversary (default) | `Agent + Skill('dissect')` (self×self Claude) | `codex exec` + `prompts/dissect.md` (self×self codex) |
-| Cross-family adversary | `--adversary=codex` (built-in via Codex MCP) | Build your own (sketch in driver README) |
-| Co-research mode | `--mode=co-research` (built-in) | Two `codex exec` with different framing (extend script) |
+| Entry | `/abelian program.md` slash command | `codex exec ... "$(cat SKILL.md INVARIANTS.md prompts/dissect.md) ..."` |
+| Orchestrator | Claude main session | Codex main session |
+| Mutator | Claude (orchestrator session) | Codex (orchestrator session) |
+| Adversary subagent | `Agent(general-purpose) + Skill('dissect')` | Fresh `codex exec` subprocess + inlined `prompts/dissect.md` |
+| Cross-family adversary | `--adversary=codex` (built-in via Codex MCP) | Sketch only (anthropic SDK + tool-use wrapper — see codex-cli driver README) |
 | 11 INVARIANTS | All hold | All hold |
 | state.json + nonce header + 7-check commit-gate | Identical | Identical |
-| Cost | 1 Claude session + dissect subagent calls | 2 codex exec calls per round |
 
 ## Quick start
 
@@ -172,13 +173,9 @@ python3 bench.py | tail -1
 10. fp-precision: don't lose >1e-9 vs baseline
 ```
 
-Then invoke:
+Then invoke per your driver. **Default mode = co-research** (Strategy axes 1, 2, 3 distributed across two peers with different framing); switch to `--mode=unilateral` for single-axis verification. **Default adversary = self×self** (same family, different prompt context); add `--adversary=codex` (Claude Code) or `--pair=claude,codex` (cross-family) for high-stakes priors.
 
-```
-/abelian program.md
-```
-
-Abelian runs **till converge** — no `--rounds` or `--budget` flag; mechanism-based termination per INVARIANTS rule #6 (goal-met / adversary-exhausted / plateau / mutual-KILL). Manual abort: SIGINT (Ctrl+C). For high-stakes runs add `--adversary=codex` (cross-family adversary) or `--mode=co-research` (peer-attack discovery).
+Abelian runs **till converge** — no `--rounds` flag, no `--budget` flag. Mechanism-based termination per INVARIANTS rule #6. Manual abort: SIGINT (Ctrl+C).
 
 ## When NOT to use Abelian
 
@@ -187,66 +184,68 @@ Abelian runs **till converge** — no `--rounds` or `--budget` flag; mechanism-b
 - Long-horizon overnight autonomous coding — use [night-shift](https://github.com/ppuliu/night-shift) instead, which is purpose-built for that
 - Continuous in-session iteration without verification gates — use [ralph-loop](https://github.com/.../ralph-loop) instead
 
-Abelian's niche: **bounded campaigns with deterministic eval and strict survive-or-revert discipline**. If your task doesn't fit that shape, a different tool will serve you better.
+Abelian's niche: **bounded campaigns with deterministic eval and strict survive-or-revert discipline, defaulting to co-research for non-trivial mutation discovery**. If your task doesn't fit that shape, a different tool will serve you better.
 
 ## Comparison
 
 | | Abelian | night-shift | ralph-loop |
 |---|---|---|---|
-| Time horizon | Bounded by `--rounds` | 8 h hard cap | Continuous in-session |
+| Time horizon | Bounded by mechanism convergence | 8 h hard cap | Continuous in-session |
 | Eval discipline | Required (4-level hierarchy) | Tests pass per task | Optional |
 | Adversary | dissect / codex / both / co-research peer | Codex required | Optional |
-| Diversity | Portfolio cells (MAP-Elites style) | Linear KR sequence | None |
-| File-gated commits | ✓ (v2.8) | ✓ | ✗ |
+| Default mode | Co-research (peer attack + propose) | Unilateral (Codex review) | n/a |
+| Diversity | Portfolio cells (MAP-Elites style) + co-research peers | Linear KR sequence | None |
+| File-gated commits | ✓ | ✓ | ✗ |
 | Drift detection | ✓ | ✓ | ✗ |
 | Anti-compaction | INVARIANTS.md re-read + state.json | INVARIANTS.md re-read + state.json | ✗ |
-| Co-research mode | ✓ (v2.6) | ✗ | ✗ |
+| Wrapper script | None — LLM harness consumes spec directly | Yes (state machine) | n/a |
 
 Use Abelian for *what to keep*. Use night-shift for *what to ship overnight*. Use ralph-loop for *what to keep working on*. They compose; they don't replace each other.
 
 ## Project status
 
-Abelian is **v2.8.3 (2026-04-28)**. Functional but young.
+Abelian is **v2.10.0 (2026-04-28)**. Functional but young.
 
 | Area | Status |
 |---|---|
-| Claude Code primary path (SKILL.md) | **Smoketested 2026-04-28** end-to-end on a Python speedup task — full v2.8 protocol exercised (state.json, INVARIANTS reread, nonce header, 7-check commit-gate, drift detection, goal-met termination, locked compound template). [Smoketest writeup](https://github.com/cauchyturing/abelian/tree/main) lives in commit history under run `2026-04-28-0414-r2`. |
-| Codex CLI driver (`drivers/codex-cli/abelian.sh`) | **Reference implementation, not yet smoketested.** Implements the full v2.8 protocol via `codex exec` subprocesses but has not been exercised against a real codex CLI run. First user is likely to hit minor issues (sandbox flag names, prompt size, eval extraction edge cases) — please [file an issue](https://github.com/cauchyturing/abelian/issues) or PR. |
-| INVARIANTS.md | **Frozen.** 11 rules, all derived from concrete failure modes (Cell 6 silent un-landing, scanner.py WIP cron breakage, atomic-swap silent-fail, dissect R3 attack-class miss). Won't change without a corresponding empirical finding. |
-| state.json schema | **Frozen for v2.8.x.** Backwards-compatible fields may be added in v2.9; breaking changes only at v3.0. |
-| Plugin marketplace install | Configured in `.claude-plugin/plugin.json`; first-time end-to-end install via `/plugin marketplace add` not yet verified by an external user. |
+| Claude Code primary path | **Smoketested 2026-04-28** end-to-end on a Python speedup task — full v2.8 protocol exercised (state.json, INVARIANTS reread, nonce header, 7-check commit-gate, drift detection, goal-met termination, locked compound template). v2.9 (till-converge) and v2.10 (co-research default + remove .sh) shipped without regression smoketest — INVARIANTS unchanged. |
+| Codex CLI primary path | **Invocation form ready, end-to-end smoketest pending.** Same SKILL.md spec; codex orchestrates directly via `codex exec`. First user should verify codex CLI version's sandbox flags + prompt budget — see [`TODO.md`](TODO.md). |
+| INVARIANTS.md | **Frozen at 11 rules.** All derived from concrete failure modes. Won't change without a corresponding empirical finding. |
+| state.json schema | **Frozen for v2.10.x.** Backwards-compatible fields may be added in v2.11; breaking changes only at v3.0. |
+| Plugin marketplace install | Configured; first-time end-to-end install via `/plugin marketplace add` not yet verified by an external user. |
 
 ## Known issues
 
-- **Codex CLI driver smoketest pending** (see Project status above). The bash + python plumbing is correct in design but un-exercised against real codex CLI invocations. See [`TODO.md`](TODO.md) for specific points.
-- **`abelian.sh` eval extraction is awk-based** and may break on `program.md` files with multiple `## Eval` blocks or unusual section markers. Single-bash-block eval works.
-- **Co-research mode in `abelian.sh`** is documented as "extend the script" but not implemented inline. The Claude Code SKILL.md path supports it natively.
-- **Cross-family adversary in `abelian.sh`** is documented as "build your own" with a sketch — no shipped wrapper. Most teams won't need this; codex × codex self×self is the recommended default.
-- **`SKILL.md` is 610 lines** — verbose by skill-design standards. Some of it could plausibly move to `references/`. Tracked in TODO but no immediate priority.
+See [`TODO.md`](TODO.md) for the file-level tracker. Highlights:
+
+- **Codex CLI primary smoketest pending.** Invocation form is correct in design but un-exercised against real codex CLI. First user expected to verify sandbox flags + prompt budget.
+- **Co-research diversity-collapse metric** is loosely specified ("candidate edit-distance falling between peer mutations"). Concrete metric (Levenshtein / AST distance / semantic) not enforced; orchestrator interprets.
+- **Cross-family adversary in codex CLI** is sketch-only (anthropic SDK + tool-use wrapper). Most teams won't need this; codex × codex with different context-framing is empirically validated.
+- **`SKILL.md` is 600+ lines** — verbose by skill-design standards. Some content could move to `references/` in v3.0; deferred to avoid churn.
 
 ## Roadmap
 
 | Version | Theme | When |
 |---|---|---|
-| v2.8.x | Codex CLI driver hardening (post-smoketest fixes) | As issues land |
-| v2.9 | Compound doc auto-generation in `abelian.sh` (currently TODO) + co-research mode in bash driver | Q3 2026 if demand |
-| v3.0 | Possibly: unify SKILL.md + drivers/ into a single driver-neutral spec; flip default to co-research per the v2.6 internal note; `INVARIANTS-CORE.md` extracted | Only after empirical track record validates the cost model |
+| v2.10.x | Codex CLI smoketest fixes (post-first-use) | As issues land |
+| v2.11 | Concrete diversity-collapse metric for co-research; `examples/` directory with worked-through campaigns | Q3 2026 if demand |
+| v3.0 | Possibly: split SKILL.md into core spec + references/; revisit `INVARIANTS-RATIONALE.md` extraction | Only after empirical track record |
 
 ## Contributing
 
 Issues and PRs welcome. A few notes:
 
 - **INVARIANTS changes** require an empirical anchor. If you propose tightening rule #X, link a concrete failure mode or campaign that the current rule misses. Speculative tightening = friction with no evidence.
-- **Driver additions** (e.g., a Cursor or Aider driver) are welcome under `drivers/<name>/`. Mirror the codex-cli driver's structure: `README.md` + executable script + adherence to the same v2.8 protocol.
-- **Bug fixes** to `abelian.sh` python heredocs or codex sandbox flags get fast-tracked — that script is a reference impl explicitly waiting for first-user feedback.
-- **Nominal style**: terse, judgment-first prose. Avoid hedging language ("might", "could", "potentially") when a concrete claim works. Mirror the existing INVARIANTS.md / SKILL.md voice.
+- **New driver paths** (e.g., a Cursor or Aider driver) are welcome under `drivers/<name>/`. Mirror the existing structure: `README.md` only, with the LLM harness's invocation form. **No wrapper scripts** — both shipped drivers are LLM-driven self-orchestration; new drivers should follow the same pattern.
+- **Bug fixes** to `prompts/dissect.md` or SKILL.md examples get fast-tracked.
+- **Style**: terse, judgment-first prose. Avoid hedging ("might", "could", "potentially") when a concrete claim works. Mirror the existing INVARIANTS.md / SKILL.md voice.
 
 For larger discussions (architectural changes, mode unification, name changes), open a GitHub Discussion or DM [@cauchyturing](https://github.com/cauchyturing).
 
 ## Acknowledgments
 
 - [@ppuliu](https://github.com/ppuliu) and [night-shift](https://github.com/ppuliu/night-shift) — the file-gate, drift-check, INVARIANTS-reread, and forbidden-termination-rationale patterns are direct borrows; the orthogonal-defenses framing came from comparing the two skills side-by-side.
-- The `dissect` skill — Abelian's default adversary is a `dissect` subagent.
+- The `dissect` skill (vendored in `skills/dissect/`) — Abelian's adversary methodology.
 - Andrej Karpathy — the "compound iteration loop" framing.
 
 ## License

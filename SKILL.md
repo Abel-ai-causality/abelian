@@ -1,6 +1,6 @@
 ---
 name: abelian
-version: 2.9.0
+version: 2.10.0
 description: >
   **Umbrella name for two distinct iteration modes** sharing common
   anti-collapse + anti-compaction infrastructure (portfolio, escalation,
@@ -9,22 +9,28 @@ description: >
   INVARIANTS.md re-read, state.json source-of-truth, forbidden termination
   rationales, pre-files snapshot, locked compound template — see INVARIANTS.md):
 
-  - **Unilateral mode (default, "auto-verify-loop")** — generator + adversary —
-    mutate → evaluate → attack → keep/revert. Best for: verification of known
-    target, ship-prep, audit, regression hardening. Cost 1×. Cross-model
-    adversary (Codex) opt-in for high-stakes.
-
-  - **Co-research mode (v2.6, "auto-research-loop")** — two peer agents both
-    propose AND challenge each other goal-driven; mutual inspiration prevents
-    the hidden collapse of "attack-only adversary + propose-only generator."
-    Best for: discovery, novel design, "where do I start", research with no
-    obvious target. Cost 2×. **Diversity via DIFFERENT CONTEXT FRAMING per
-    peer at SAME max-effort tier** (not via downgrading one peer). Cross-model
-    pair preferred for highest diversity; same-model pair with different
+  - **Co-research mode (default since v2.10, "auto-research-loop")** — two peer
+    agents both propose AND challenge each other goal-driven; mutual inspiration
+    prevents the hidden collapse of "attack-only adversary + propose-only
+    generator." Best for: discovery, novel design, "where do I start",
+    non-trivial work where any mutation has multiple defensible directions.
+    Cost 2× per round but ~1.5× fewer rounds for non-trivial work
+    (~33% net overhead). **Diversity via DIFFERENT CONTEXT FRAMING per peer
+    at SAME max-effort tier** (not via downgrading one peer). Cross-model pair
+    preferred for highest diversity; same-model pair with different
     context-framing is acceptable and beats opus+haiku per empirical 2026-04-26.
 
-  Pick mode by phase: known-target verification → unilateral; discovery /
-  non-trivial design → co-research (--mode=co-research).
+  - **Unilateral mode (--mode=unilateral, "auto-verify-loop")** — generator +
+    adversary — mutate → evaluate → attack → keep/revert. Opt-in for known-
+    target verification, ship-prep, audit, regression hardening, single-axis
+    micro-optimization. Cost 1×. Cross-model adversary (Codex) opt-in for
+    high-stakes.
+
+  Default = co-research per v2.10 first-principles audit (collaborative
+  framing > adversarial framing on Codex; "unilateral attack-only is itself
+  a collapse vector for non-trivial work" — SKILL.md's own prior wording).
+  Switch to unilateral with --mode=unilateral when the task is genuinely
+  single-axis verification.
 
   **Target should include executable artifacts whenever possible —
   spec-only is the degraded mode for both modes.**
@@ -34,7 +40,7 @@ description: >
   unilateral verification too despite "research" framing); future v3.0 may flip
   default to co-research once empirical track record validates cost model.
 user-invocable: true
-argument-hint: 'abelian program.md [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K] [--mode=co-research]'
+argument-hint: 'abelian program.md [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K] [--mode=unilateral]'
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
@@ -221,7 +227,7 @@ For each round:
 **Driver-neutral protocol**: a fresh adversary subagent receives a prompt that includes verbatim `program.md` Goal/Target/Constraints/Attack-Classes + a fresh nonce + ISO timestamp, executes in isolated context with its own tool access (Read/Bash/Write or equivalent), writes the attack list to `$RUN_DIR/round-N/adversary.txt` with a mandatory `ABELIAN-ADV-v1` header (rule #11), and returns the verdict line. Two reference dispatches:
 
 - **Claude Code primary**: `Agent(general-purpose)` running `Skill('dissect')` — see [`drivers/claude-code/README.md`](drivers/claude-code/README.md). This is the default for `/abelian program.md` invocation in a Claude Code session. Adversary subagent is a Claude with same RLHF family as the mutator — structural role split, weak prior split.
-- **Codex CLI primary**: `codex exec - -s workspace-write` subprocess + the [`prompts/dissect.md`](prompts/dissect.md) template — see [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md) and the runnable [`drivers/codex-cli/abelian.sh`](drivers/codex-cli/abelian.sh). Self×self default (codex × codex with different prompt context per role at full max-effort).
+- **Codex CLI primary**: `codex exec - -s workspace-write` subprocess + the [`prompts/dissect.md`](prompts/dissect.md) template — see [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md). Self×self default (codex × codex with different prompt context per role at full max-effort). No wrapper script — codex CLI is itself an LLM agent harness consuming SKILL.md directly, the same way Claude Code does.
 
 Both drivers honor the same protocol and INVARIANTS. The descriptions below use Claude Code idiom (Agent / Skill / MCP) because abelian's original implementation was Claude Code. Codex CLI users substitute `codex exec` for `Agent(...)` and `prompts/dissect.md` content for `Skill('dissect')`. Mechanism, header, gate, and INVARIANTS are byte-for-byte identical.
 
