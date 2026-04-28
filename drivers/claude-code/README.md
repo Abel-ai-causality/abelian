@@ -25,14 +25,13 @@ git clone https://github.com/cauchyturing/abelian.git ~/.claude/skills/abelian
 Restart Claude Code. The skill auto-registers. Then in any session:
 
 ```
-/abelian program.md --rounds=10
+/abelian program.md
 ```
 
-For high-stakes runs that warrant cross-family priors, add Codex MCP via
-your normal MCP server setup, then:
+Abelian runs till converge (mechanism-based termination per INVARIANTS rule #6 — no `--rounds` cap; manual abort via SIGINT). For high-stakes runs that warrant cross-family priors, add Codex MCP via your normal MCP server setup, then:
 
 ```
-/abelian program.md --rounds=10 --adversary=codex
+/abelian program.md --adversary=codex
 ```
 
 (Or `--adversary=both` for union-of-attacks from dissect Claude subagent

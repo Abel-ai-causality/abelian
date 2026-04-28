@@ -1,6 +1,6 @@
 ---
 name: abelian
-version: 2.8.3
+version: 2.9.0
 description: >
   **Umbrella name for two distinct iteration modes** sharing common
   anti-collapse + anti-compaction infrastructure (portfolio, escalation,
@@ -34,7 +34,7 @@ description: >
   unilateral verification too despite "research" framing); future v3.0 may flip
   default to co-research once empirical track record validates cost model.
 user-invocable: true
-argument-hint: 'abelian program.md [--rounds=N] [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K]'
+argument-hint: 'abelian program.md [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K] [--mode=co-research]'
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
@@ -110,7 +110,7 @@ Minimal schema:
   "branch": "feat/xyz",
   "expected_head": "abc1234",
   "program_path": "program.md",
-  "shape": {"rounds": 10, "chains": 1, "depth": 1, "candidates": 1, "portfolio": 1},
+  "shape": {"chains": 1, "depth": 1, "candidates": 1, "portfolio": 1},
   "adversary_mode": "dissect",
   "rounds": [
     {
@@ -134,7 +134,7 @@ Minimal schema:
 }
 ```
 
-Valid run `status`: `running`, `completed`, `interrupted`, `drift-stopped`, `cap-fired`, `gate-failed-terminal`.
+Valid run `status`: `running`, `completed`, `interrupted`, `drift-stopped`, `gate-failed-terminal`. (`cap-fired` removed in v2.9 along with the budget cap concept; runs that previously cap-fired now run till mechanism-based converge or manual interrupt.)
 Valid round `status`: `pending`, `mutated`, `eval-done`, `adversary-done`, `kept`, `reverted`, `gate-failed`.
 
 Update after: every round step transition, every commit, every revert,
@@ -154,26 +154,30 @@ For harder problems, factor compute budget across three orthogonal levers:
 
 **Orthogonal to Portfolio K.** `--portfolio=K` maintains K diverse cells (MAP-Elites) ACROSS rounds; C/L/candidates shape WITHIN a round. Chains in C>1 can write into different portfolio cells if both are set.
 
-### Budget accounting (v2.4 requirement, v2.5 corrected)
+### Per-round cost shape (v2.9 — informational, not a cap)
 
-Loop MUST announce before starting:
+Abelian no longer requires a `--rounds` or `--budget` cap (v2.9 removed
+both — see Termination Discipline). The loop runs till converge per
+INVARIANTS rule #6. The v2.4–v2.5 budget accounting block is retained
+below as **informational** so users can sanity-check their program.md
+target before starting; the formula no longer drives a `--confirm-budget`
+gate, but is useful for setting realistic expectations on cost per round
+and total cost at typical convergence (3–10 rounds for most campaigns).
 
 ```
-Campaign: <name>
-Shape:    rounds=R, chains=C, depth=L, candidates=M, portfolio=K
-Raw budget:        R × C × L × M       eval runs
-                   R × C × L           adversary calls
-Effective budget:  raw × (1 + α × β)   accounts for fix-iter cycles
-                   α = expected attack rate per round
-                       (dissect 0.6, codex xhigh 0.8, both 1.0)
-                   β = avg fix cost in eval+adversary units (default 1.5)
-                   → multiplier ~1.9× (dissect) / ~2.2× (codex) / ~2.5× (both)
-Adversary cost note: codex xhigh (latest stable, currently gpt-5.5) ≈ $0.5-2/call.
+Per-round cost shape:
+  Shape:           chains=C, depth=L, candidates=M, portfolio=K
+  Eval runs:       C × L × M
+  Adversary calls: C × L
+  Fix-iter multiplier: ~1.5 cycles per attack (write fix → re-eval → maybe re-adversary)
+                       α (attack rate): dissect ~0.6, codex xhigh ~0.8, both ~1.0
+                       β (fix cost): ~1.5 eval+adversary units
+                       → effective per-round multiplier ~1.9× (dissect) / ~2.2× (codex) / ~2.5× (both)
+  Adversary cost: codex xhigh (latest stable) ≈ $0.5–2/call
+  Typical convergence: 3–10 rounds depending on Strategy axis count and program.md target tightness
 ```
 
-**v2.5 budget correction**: v2.4 raw formula systematically under-estimated 2-12× (P0 audit campaign 2026-04-26: budget said 6 calls, actual was ~12 evals + 4 large adversary calls + multiple fix-iter cycles ≈ 60min wall). Each adversary attack triggers ~1.5 fix-iter cycles (write fix → re-eval → maybe re-adversary). Plan with the multiplier.
-
-User confirms before loop begins. Refuse to start if (effective budget > 30) without explicit `--confirm-budget` flag.
+**Empirical from P0 audit campaign 2026-04-26**: raw formula under-estimated 2–12× when fix-iter cycles weren't counted; v2.5 multiplier accounts for this. If you're cost-sensitive, run a single dry-round first to calibrate before letting the till-converge loop proceed unattended.
 
 ### Parallel expansion semantics (C>1 or L>1 or candidates>1)
 
@@ -185,13 +189,18 @@ User confirms before loop begins. Refuse to start if (effective budget > 30) wit
 
 ```
 /abelian program.md \
-  --rounds=R \
-  --chains=C      # default 1
-  --depth=L       # default 1
-  --candidates=M  # default 1
-  --portfolio=K   # default 1 (single champion)
-  --adversary=codex
+  --chains=C       # default 1
+  --depth=L        # default 1
+  --candidates=M   # default 1
+  --portfolio=K    # default 1 (single champion)
+  --mode=co-research  # optional, switches to peer-attack mode
+  --adversary=codex   # optional, cross-family adversary (high stakes)
 ```
+
+**No `--rounds` / `--budget` flag**. Abelian runs **till converge** per
+INVARIANTS rule #6 (goal-met / adversary-exhausted / plateau / mutual-KILL).
+Manual abort: send SIGINT (Ctrl+C) → `status=interrupted` + handoff.
+See "Termination Discipline" below for the rationale.
 
 ## The Loop
 
@@ -499,19 +508,35 @@ deliberate claim. Prevents the silent kicked-down-the-road items (e.g.,
 P0-audit campaign 2026-04-26 had 4 deferred items in compound doc but
 escalations.md was empty — wrong place, wrong visibility for reviewers).
 
-## Termination Discipline (v2.8)
+## Termination Discipline (v2.9)
 
-A loop's termination claim is valid only if backed by mechanism, not preference. INVARIANTS rule #6 enumerates 5 forbidden rationales — "diminishing returns", "time remaining", "deferred to next session", "foundation in place", "cleaner to ship". These are stopping preferences disguised as conclusions; treat them as hard refusals.
+Abelian runs **till converge**. There is no `--rounds` cap, no `--budget` flag, no wallclock cap. A loop's termination claim is valid only if backed by mechanism, not preference. INVARIANTS rule #6 enumerates 5 forbidden rationales — "diminishing returns", "time/token remaining", "deferred to next session", "foundation in place", "cleaner to ship". These are stopping preferences disguised as conclusions; treat them as hard refusals.
 
-Valid termination conditions only:
+Valid termination conditions (N=3 hardcoded internal default for plateau/exhaustion thresholds):
 
 - **Goal met** — eval ≥ target (unilateral) OR champion ≥ target (co-research)
-- **Adversary exhausted across all attack classes** + execution gate satisfied (INVARIANTS rule #9)
-- **Plateau + diversity collapse** — N rounds no eval improvement AND candidate edit-distance falling (co-research)
-- **Mutual KILL deadlock** — every peer attack succeeds on both sides for N rounds (co-research)
-- **--rounds cap fired** — handled by the runtime, no rationale required
+- **Adversary exhausted across all attack classes for N=3 consecutive rounds** + execution gate satisfied (INVARIANTS rule #9). Each attack class in the program.md checklist addressed with no concrete attack across N rounds.
+- **Plateau** — N=3 consecutive rounds with no eval improvement. Co-research mode additionally requires diversity collapse (candidate edit-distance falling between peer mutations).
+- **Mutual KILL deadlock** — N=3 rounds where every peer attack succeeds on both sides (co-research only).
 
-If your honest framing of "why stop" reduces to a forbidden rationale, do NOT write the termination claim or post-campaign compound doc. Run another round. The cap will catch the runtime case on its own.
+If a mechanism signal would not fire by round 3, the loop has not actually converged. Either tighten the program.md target/eval or wait for the user to abort manually.
+
+**Manual abort path** (not a termination condition, an emergency stop):
+- User sends SIGINT (Ctrl+C) or SIGTERM
+- Abelian marks `state.status = "interrupted"`, finishes the current round's atomic operation if mid-commit (per night-shift's "finish current task" pattern), writes handoff/compound-doc with explicit interrupted marker, exits.
+
+**Self-check before terminating** (mandatory): re-read INVARIANTS rule #6 from disk (rule #3) and verify your claimed reason is on the valid list, not the forbidden list. Document the rule-#6 self-check in `state.termination` block:
+
+```json
+"termination": {
+  "condition": "goal-met | adversary-exhausted | plateau | mutual-KILL | interrupted",
+  "evidence": "<verbatim quote from eval/adversary/state>",
+  "rounds_at_termination": 7,
+  "rule6_self_check": "<one sentence — which forbidden rationale was tempting and why it does not apply>"
+}
+```
+
+If you cannot fill `rule6_self_check` with a substantive answer, you are about to terminate on a preference. Run another round.
 
 **Self-check before terminating** (mandatory): re-read INVARIANTS rule #6 from disk (rule #3) and verify your claimed reason is on the valid list, not the forbidden list. Document the rule-#6 self-check in `state.termination` block:
 

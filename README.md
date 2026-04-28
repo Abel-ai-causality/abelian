@@ -175,10 +175,10 @@ python3 bench.py | tail -1
 Then invoke:
 
 ```
-/abelian program.md --rounds=10
+/abelian program.md
 ```
 
-For high-stakes runs add `--adversary=codex` (cross-model adversary) or `--mode=co-research` (peer-attack discovery).
+Abelian runs **till converge** — no `--rounds` or `--budget` flag; mechanism-based termination per INVARIANTS rule #6 (goal-met / adversary-exhausted / plateau / mutual-KILL). Manual abort: SIGINT (Ctrl+C). For high-stakes runs add `--adversary=codex` (cross-family adversary) or `--mode=co-research` (peer-attack discovery).
 
 ## When NOT to use Abelian
 

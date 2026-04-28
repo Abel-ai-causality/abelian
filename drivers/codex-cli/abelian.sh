@@ -30,7 +30,9 @@ fi
 
 # ---------- Args + paths ----------
 PROGRAM=${1:-program.md}
-ROUNDS=${ABELIAN_ROUNDS:-5}
+# v2.9: NO rounds/budget cap. Loop runs till converge per INVARIANTS rule #6.
+# Manual abort: SIGINT (Ctrl+C) → trap below sets status=interrupted + exits.
+PLATEAU_N=${ABELIAN_PLATEAU_N:-3}  # consecutive rounds for plateau/exhaustion (hardcoded internal default; overridable for testing only)
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 ABELIAN_REPO=$(cd "${SCRIPT_DIR}/../.." && pwd)
 PROMPT_TEMPLATE="${ABELIAN_REPO}/prompts/dissect.md"
@@ -70,8 +72,9 @@ cat > "$RUN_DIR/state.json" <<EOF
   "branch": "$BRANCH",
   "expected_head": "$BASE_COMMIT",
   "program_path": "$PROGRAM",
-  "shape": {"rounds": $ROUNDS, "chains": 1, "depth": 1, "candidates": 1, "portfolio": 1},
+  "shape": {"chains": 1, "depth": 1, "candidates": 1, "portfolio": 1},
   "adversary_mode": "codex_self",
+  "termination_plateau_n": $PLATEAU_N,
   "rounds": [],
   "champion": null,
   "portfolio_cells": {},
@@ -79,10 +82,17 @@ cat > "$RUN_DIR/state.json" <<EOF
 }
 EOF
 touch "$RUN_DIR/escalations.md"
+
+# Manual abort handler: SIGINT (Ctrl+C) → mark status=interrupted, exit cleanly
+trap 'echo; echo "INTERRUPT received — finalizing state.json and exiting..."; jq ".status = \"interrupted\" | .ended_at = \"$(date -Iseconds)\"" "$RUN_DIR/state.json" > "$RUN_DIR/state.json.tmp" && mv "$RUN_DIR/state.json.tmp" "$RUN_DIR/state.json"; exit 130' INT TERM
+
 echo "═══════════════════════════════════════════════════════════════"
-echo "  ABELIAN run started: RUN_ID=$RUN_ID  ($ROUNDS rounds)"
+echo "  ABELIAN run started: RUN_ID=$RUN_ID"
 echo "  Branch: $BRANCH @ $BASE_COMMIT"
 echo "  Mode:   codex × codex (self×self, same family)"
+echo "  Termination: till converge (goal-met / adversary-exhausted /"
+echo "               plateau / mutual-KILL — N=$PLATEAU_N consecutive rounds)"
+echo "  Abort: Ctrl+C for manual interrupt"
 echo "═══════════════════════════════════════════════════════════════"
 
 # ---------- Helpers ----------
@@ -106,13 +116,19 @@ drift_check() {
 }
 
 # ---------- The Loop ----------
+# v2.9: while true; converge check after each round breaks out of the loop.
+# No round/budget cap. Manual abort via SIGINT trap above.
 ROUND=0
-while [ $ROUND -lt $ROUNDS ]; do
+PLATEAU_STREAK=0   # consecutive rounds with no eval improvement
+EXHAUST_STREAK=0   # consecutive rounds with adversary returning empty attack list
+PREV_METRIC=""
+
+while true; do
   ROUND=$((ROUND + 1))
   ROUND_DIR="$RUN_DIR/round-$ROUND"
   mkdir -p "$ROUND_DIR"
   echo
-  echo "─── Round $ROUND / $ROUNDS ───"
+  echo "─── Round $ROUND ───"
 
   # Step 0: Refresh (INVARIANTS rule #3)
   cat "$INVARIANTS" >/dev/null  # re-read from disk; production would inject into mutator context
@@ -293,18 +309,61 @@ PYEOF
   fi
 done
 
-# ---------- Termination ----------
-# TODO(v2.9): add goal-met early termination check (eval ≤ target per program.md
-#             Metric block) — currently only --rounds cap fires. The Claude
-#             Code SKILL.md path handles this natively in step 6 (Place).
+  # ---------- Convergence check (after each round) ----------
+  # v2.9: 4 mechanism-based termination conditions per INVARIANTS rule #6.
+  # No round/budget cap. Loop continues until ONE of these fires:
+  #   1. Goal met       — metric meets program.md target (parsing TODO below)
+  #   2. Adversary exhausted — N consecutive rounds with no concrete attacks
+  #   3. Plateau        — N consecutive rounds with no eval improvement
+  #   4. Mutual KILL    — co-research only, not implemented in this driver
+  # TODO(v2.9): goal-met needs to parse program.md `## Metric target:` and
+  #             compare to current metric. Currently only plateau + exhaustion
+  #             can trigger termination. Goal-met fires for cases where eval
+  #             is dramatic (target reached round 1 like the smoketest); will
+  #             be handled correctly by plateau in subsequent rounds.
+
+  CURRENT_METRIC=$(state_get '.rounds[-1].metric_value')
+
+  # Plateau check: no improvement vs previous round (assumes direction=min; flip for max)
+  if [ -n "$PREV_METRIC" ] && [ "$(echo "$CURRENT_METRIC >= $PREV_METRIC" | bc -l 2>/dev/null || echo 0)" = "1" ]; then
+    PLATEAU_STREAK=$((PLATEAU_STREAK + 1))
+  else
+    PLATEAU_STREAK=0
+  fi
+  PREV_METRIC=$CURRENT_METRIC
+
+  # Exhaustion check: verdict line indicates clean (no attacks)
+  if echo "$VERDICT" | grep -qiE 'no attacks|n/a-this-target|clean'; then
+    EXHAUST_STREAK=$((EXHAUST_STREAK + 1))
+  else
+    EXHAUST_STREAK=0
+  fi
+
+  echo "  [conv] plateau_streak=$PLATEAU_STREAK exhaust_streak=$EXHAUST_STREAK (N=$PLATEAU_N)"
+
+  if [ "$PLATEAU_STREAK" -ge "$PLATEAU_N" ]; then
+    echo "  [✓]   TERMINATE: plateau ($PLATEAU_STREAK consecutive rounds no improvement)"
+    state_update ".status = \"completed\" | .termination = {\"condition\": \"plateau\", \"evidence\": \"plateau_streak=$PLATEAU_STREAK\", \"rounds_at_termination\": $ROUND, \"rule6_self_check\": \"plateau is mechanism-based (no improvement N=$PLATEAU_N rounds), not a forbidden rationale\"}"
+    break
+  fi
+
+  if [ "$EXHAUST_STREAK" -ge "$PLATEAU_N" ]; then
+    echo "  [✓]   TERMINATE: adversary exhausted ($EXHAUST_STREAK consecutive clean rounds)"
+    state_update ".status = \"completed\" | .termination = {\"condition\": \"adversary-exhausted\", \"evidence\": \"exhaust_streak=$EXHAUST_STREAK\", \"rounds_at_termination\": $ROUND, \"rule6_self_check\": \"adversary exhaustion across N=$PLATEAU_N rounds + execution gate is mechanism-based, not a preference\"}"
+    break
+  fi
+done
+
+# ---------- Termination cleanup ----------
 # TODO(v2.9): auto-generate compound doc to docs/solutions/[category]/[goal-slug]-[date].md
 #             per SKILL.md "## When It Ends: Auto-Compound" — currently a manual step.
 # TODO(v2.9): post-campaign escalation review (mandatory per SKILL.md "## Escalation"
 #             Mandatory Post-Campaign Escalation Review section) — currently skipped
 #             by this driver.
-state_update ".status = \"cap-fired\" | .ended_at = \"$(python3 -c 'import datetime; print(datetime.datetime.now().astimezone().isoformat(timespec=\"seconds\"))')\""
+state_update ".ended_at = \"$(python3 -c 'import datetime; print(datetime.datetime.now().astimezone().isoformat(timespec=\"seconds\"))')\""
 echo
 echo "═══════════════════════════════════════════════════════════════"
-echo "  ABELIAN run done: $RUN_DIR"
+TERM=$(state_get '.termination.condition // "unknown"')
+echo "  ABELIAN run done: $RUN_DIR  (termination: $TERM, rounds: $ROUND)"
 echo "  Compound doc: docs/solutions/[category]/${RUN_ID}.md (write manually or extend script)"
 echo "═══════════════════════════════════════════════════════════════"

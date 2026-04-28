@@ -92,28 +92,33 @@ cannot run cleanly = drift-stopped on first failure.
 
 ## 6. Forbidden termination rationales
 
+Abelian runs **till converge**. There is no `--rounds` cap, no `--budget`
+flag, no wallclock cap (v2.9 removed all of these). The only fallback for
+"stop now" is the user sending SIGINT/SIGTERM — manual emergency abort,
+marked `status=interrupted`, NOT a valid termination signal.
+
 The loop MUST NOT terminate or write a "done" claim if the
 load-bearing reason for stopping reduces to ANY of:
 
 - "Diminishing returns" / "remaining work is lower-value"
-- "Time remaining is short" / "won't fit before --rounds cap"
+- "Time remaining is short" / "tokens running out" / "running long"
 - "Deferred to future campaign / TODO / next session"
 - "Foundation in place" / "natural stopping point" / "good break here"
 - "Cleaner to ship what we have than fold in more"
 
 These are stopping preferences, not goal-fulfillment. Termination is
-justified only by:
+justified only by mechanism (N=3 is the hardcoded internal default for
+plateau / exhaustion thresholds — not a user flag):
 
 - **Goal met** — eval ≥ target (unilateral) OR champion ≥ target (co-research)
-- **Adversary exhausted across attack classes** + execution gate (rule #9)
-- **Plateau + diversity collapse** — N consecutive rounds no eval
-  improvement AND candidate edit-distance falling (co-research)
-- **Mutual KILL deadlock** — N rounds where every peer attack
-  succeeds on both sides (co-research)
-- **--rounds cap fired** — handled separately, no rationale needed
+- **Adversary exhausted across attack classes for N=3 consecutive rounds** + execution gate (rule #9). Each attack class addressed with no concrete attack across N rounds.
+- **Plateau** — N=3 consecutive rounds with no eval improvement. Co-research mode adds: AND candidate edit-distance falling between peer mutations (diversity collapse).
+- **Mutual KILL deadlock** — N=3 rounds where every peer attack succeeds on both sides (co-research only).
 
-The cap path handles its own case. Run another round; do not
-predict whether it will finish.
+If a mechanism signal would not fire by round 3, the loop has not
+actually converged. Either tighten program.md (target/eval) or wait
+for the user to abort. "Running long" is a forbidden rationale —
+either fire a real mechanism signal or let the user SIGINT.
 
 ## 7. Verbatim Goal/Target/Constraints in adversary prompts
 
