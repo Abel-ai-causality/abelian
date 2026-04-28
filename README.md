@@ -6,7 +6,7 @@
 >
 > File-gated, drift-checked, anti-compaction.
 
-[![Version](https://img.shields.io/badge/version-2.8.3-blue.svg)](https://github.com/cauchyturing/abelian/releases)
+[![Version](https://img.shields.io/badge/version-2.9.0-blue.svg)](https://github.com/cauchyturing/abelian/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Drivers](https://img.shields.io/badge/drivers-Claude%20Code%20%7C%20Codex%20CLI-orange.svg)](#install)
 
