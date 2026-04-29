@@ -237,3 +237,63 @@ artifacts.
 For Threat-2 (deliberate fabrication) and Threat-3 (lazy adversary
 output), see attack-class checklist (program.md) and post-campaign
 escalation review respectively.
+
+## 12. Code Review supplemental gate (opt-in, v2.11+)
+
+`--code-review=on` enables an additional code-quality review layer that
+runs **after** rule #1's dissect/codex adversary call and **before**
+rule #2's commit-gate. It uses codex CLI's purpose-built `codex review`
+subcommand (with its built-in P1/P2/P3 severity schema) — separate from
+and supplemental to rule #1's domain-specific attack-class adversary.
+
+**Why supplemental, not replacement**: dissect adversary covers
+domain-specific attack classes the program.md author defined (e.g.
+"correctness must match O(N²) baseline", "integer-overflow at N=4M").
+codex review covers code-quality issues codex's built-in prompt is
+tuned for (style, common bugs, missed edge cases). Different
+maintenance domains; both useful when stakes are high.
+
+**Invocation**:
+
+```bash
+codex review --uncommitted -c 'model_reasoning_effort="high"' \
+  2>&1 | tee $RUN_DIR/round-N/codex-review.txt
+```
+
+`--uncommitted` reviews staged + unstaged + untracked changes — exactly
+abelian's state at this loop step (mutation written to working tree, not
+yet committed). If `node` is not in PATH, prefix with `bun
+/path/to/codex` (per `~/.bashrc` shim convention).
+
+**Commit-gate addition** (rule #2 grows from 7 → 8 checks when
+`--code-review=on`):
+
+8. `$RUN_DIR/round-N/codex-review.txt` exists, non-empty, AND contains
+   no `[P1]` or `[P2]` severity markers.
+
+**Loop semantics**: night-shift's "fix → re-review → max 10 rounds →
+revert" pattern is allowed but optional. Simplest form: a single
+review pass; if P1/P2 present, revert immediately and let mutator
+propose differently next round. Up to the orchestrator's discretion;
+the gate-check itself is binary.
+
+**Graceful degradation** (loud, never silent):
+- `--code-review=on` + codex CLI unavailable (binary missing OR
+  `~/.codex/auth.json` absent) → skip rule #12 only (don't fail loop),
+  write notice in 3 places (console + escalations.md + History row)
+- Fall back to rule #2's 7-check gate with rule #12 marked "skipped:
+  codex unavailable"
+
+**Honest scope**: rule #12 has **no nonce header protection** (rule #11
+does not apply — codex review's CLI doesn't accept custom prompt
+injection that would let the orchestrator inject a header block). A
+mutator that wanted to fabricate `codex-review.txt` could. The
+practical mitigation: mutator cannot predict codex's actual review
+wording, so fabrication requires writing a plausible P1/P2-free
+review — non-trivial effort. This is friction-level defense, weaker
+than rule #11's nonce protection but better than no gate.
+
+**When to enable**: ship-prep, PR-level decisions, security-sensitive
+mutations, code-quality ratchet campaigns. Default off because cost
+doubles per round and most campaigns (speedup / refactor) are
+already covered by dissect's attack-class checklist.

@@ -33,6 +33,12 @@ The codex session you just launched becomes the **mutator + orchestrator**. For 
 
 codex maintains state.json via `jq`, generates nonces via `python3 -c "import secrets; ..."`, runs git ops directly, and dispatches adversary subagents via `codex exec`. No wrapper is needed because codex already has shell access to all of this.
 
+## Code Review supplemental gate (`--code-review=on`, v2.11+)
+
+When the orchestrator's prompt enables `--code-review=on` (INVARIANTS rule #12), each round runs an additional `codex review --uncommitted -c 'model_reasoning_effort="high"'` after the adversary call and before the commit-gate. The codex review's `[P1]/[P2]/[P3]` severity output goes to `round-N/codex-review.txt`; commit-gate's 8th check refuses the commit if `[P1]` or `[P2]` markers are present. This is a code-quality layer (codex's built-in review prompt) supplemental to rule #1's domain-specific dissect adversary.
+
+`--code-review` requires the same codex CLI install + auth as `--adversary=codex`. If `node` is not in PATH, prefix with `bun /path/to/codex` per the bun-shim convention. Default off because per-round cost roughly doubles.
+
 ## Cross-family adversary (advanced, not built-in)
 
 If you want a Claude adversary for cross-RLHF-family priors on a high-stakes campaign, install the `anthropic` Python SDK and instruct codex to call it for the adversary step:

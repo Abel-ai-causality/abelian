@@ -4,6 +4,28 @@ Tracked at the protocol level. Issues filed on GitHub mostly track items here.
 
 ## Open
 
+### Smoketest of `--code-review=on` path (rule #12, v2.11)
+
+`codex review --uncommitted` verified functional locally 2026-04-28 (via
+`bun /home/bht/.npm-global/bin/codex review --help`; node not in PATH but
+bun shim works per `~/.bashrc`). Not yet exercised end-to-end in an
+abelian campaign — first user enabling `--code-review=on` will be the
+smoketest. Specific points to verify:
+
+- codex review respects `~/.codex/config.toml` defaults (model selection,
+  sandbox mode) — orchestrator passes `-c 'model_reasoning_effort="high"'`
+  override
+- `codex-review.txt` output format: confirm `[P1]/[P2]/[P3]` markers
+  follow expected pattern; if codex's output schema diverges, gate
+  check needs adjustment
+- Loop-until-clean semantics: night-shift uses fix → re-review → max
+  10 rounds before revert. Abelian's current default is single-pass
+  (P1/P2 → revert immediately, let mutator propose differently next
+  round). May want to add `--code-review-max-rounds=N` knob if real
+  campaigns show benefit from in-round iteration.
+- bun shim ergonomics: when `node` not in PATH, orchestrator must use
+  `bun codex review ...`. Document this clearly in dispatch path.
+
 ### Smoketest of codex CLI primary path
 
 The Claude Code path was smoketested 2026-04-28 (count_duplicate_pairs

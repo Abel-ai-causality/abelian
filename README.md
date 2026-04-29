@@ -74,12 +74,12 @@ For each round:
 
 When termination fires, the orchestrator runs a mandatory post-campaign escalation review (asks the adversary "what was deferred?") and writes a locked-template compound doc to `docs/solutions/[category]/[goal-slug]-[date].md`. Future runs on the same target read that doc first — **each run starts where the last one ended**.
 
-## The 11 INVARIANTS
+## The 12 INVARIANTS
 
 These rules live in `INVARIANTS.md` and are re-read at the start of every round. Skipping any of them is a protocol violation, not an optimization:
 
 1. **Adversary output must be on disk** (not just conversation context)
-2. **Commit-gate** — 7 checks: file exists, header nonce matches, mtime in valid window, verdict in body, drift check, pre-files exists, eval value matches state
+2. **Commit-gate** — 7 checks (8 with `--code-review=on`): file exists, header nonce matches, mtime in valid window, verdict in body, drift check, pre-files exists, eval value matches state, [+ codex-review.txt clean of P1/P2]
 3. **Per-round refresh** — `cat INVARIANTS.md && cat state.json` from disk
 4. **Drift check** — `expected_head` + branch + dirty-tree before any commit/revert
 5. **Pre-files snapshot** — `git ls-files` inventory before mutate
@@ -89,6 +89,7 @@ These rules live in `INVARIANTS.md` and are re-read at the start of every round.
 9. **Execution gate** — adversary-exhaustion alone is necessary but not sufficient
 10. **Production-runtime safety** — cron/supervisor/watchdog file edits need extra discipline
 11. **Adversary header block** — mandatory `ABELIAN-ADV-v1` format with nonce + timestamp
+12. **Code Review supplemental gate** *(opt-in, `--code-review=on`)* — `codex review --uncommitted` as additional code-quality gate; output to `codex-review.txt`; commit refused if `[P1]` or `[P2]` markers present
 
 Full text in [INVARIANTS.md](INVARIANTS.md).
 
@@ -169,7 +170,7 @@ python3 bench.py | tail -1
 10. fp-precision: don't lose >1e-9 vs baseline
 ```
 
-Then invoke per your driver. **Default mode = co-research** (Strategy axes 1, 2, 3 distributed across two peers with different framing); switch to `--mode=unilateral` for single-axis verification. **Default adversary = self×self** (same family, different prompt context); add `--adversary=codex` (Claude Code) for cross-family priors on high-stakes runs.
+Then invoke per your driver. **Default mode = co-research** (Strategy axes 1, 2, 3 distributed across two peers with different framing); switch to `--mode=unilateral` for single-axis verification. **Default adversary = self×self** (same family, different prompt context); add `--adversary=codex` (Claude Code) for cross-family priors on high-stakes runs. For ship-prep / PR-level / security-sensitive runs, add `--code-review=on` to enable codex CLI's `codex review` as a supplemental code-quality gate (rule #12, P1/P2 must be clean before commit).
 
 Abelian runs **till converge** — no `--rounds` flag, no `--budget` flag. Mechanism-based termination per INVARIANTS rule #6. Manual abort: SIGINT (Ctrl+C).
 
@@ -184,7 +185,7 @@ Abelian's niche: **bounded campaigns with deterministic eval and strict survive-
 
 ## Status
 
-v2.10.2 (2026-04-28). codex CLI subprocess is the canonical path; codex MCP is optional alternative if user has a wrapper.
+v2.11.0 (2026-04-28). codex CLI subprocess is the canonical path; codex MCP is optional alternative if user has a wrapper. v2.11 adds `--code-review=on` opt-in supplemental gate using `codex review --uncommitted` (INVARIANTS rule #12) — verified locally that `codex review` is functional via bun shim, but not yet smoketested against an abelian campaign.
 
  Claude Code path with **dissect adversary** smoketested 2026-04-28 (count_duplicate_pairs campaign — full v2.8 protocol exercised). **codex CLI subprocess path** is functional locally (codex CLI installed + auth'd via `~/.codex/auth.json`) but not yet dogfooded against an abelian campaign — first run of `--adversary=codex` will be the smoketest. **codex MCP wrapper path** (optional alternative) is not maintained by abelian; if you have a wrapper configured, the orchestrator may use it. **Codex CLI primary driver** invocation form un-tested by external user — see [TODO.md](TODO.md).
 

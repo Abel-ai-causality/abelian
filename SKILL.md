@@ -1,6 +1,6 @@
 ---
 name: abelian
-version: 2.10.2
+version: 2.11.0
 description: >
   **Umbrella name for two distinct iteration modes** sharing common
   anti-collapse + anti-compaction infrastructure (portfolio, escalation,
@@ -40,7 +40,7 @@ description: >
   unilateral verification too despite "research" framing); future v3.0 may flip
   default to co-research once empirical track record validates cost model.
 user-invocable: true
-argument-hint: 'abelian program.md [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K] [--mode=unilateral]'
+argument-hint: 'abelian program.md [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K] [--mode=unilateral] [--code-review=on]'
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
@@ -217,7 +217,7 @@ For each round:
 2. **Mutate** — apply the change (minimal, one idea per round). Before writing, snapshot pre-files: `mkdir -p $RUN_DIR/round-N && { git ls-files -z; git ls-files -z --others --exclude-standard; } | sort -zu > $RUN_DIR/round-N/pre-files.txt`. INVARIANTS rule #5.
 3. **Evaluate** — run eval command, or self-judge against frozen rubric. Write metric value to `$RUN_DIR/round-N/eval.txt` and update `state.rounds[N].metric_value`.
 4. **Adversary** — spawn `Agent(general-purpose)` that runs `Skill('dissect')` on the diff + eval output. Adversary subagent MUST write full attack list (or `n/a-this-target` per class) to `$RUN_DIR/round-N/adversary.txt` BEFORE returning, and the verdict line MUST be recorded in `state.rounds[N].verdict_line`. INVARIANTS rules #1, #7. (See Adversary section.)
-5. **Confirm** — no attacks: run commit-gate (INVARIANTS rule #2, 7 checks: `adversary.txt` non-empty + header block nonce matches `state.adversary_nonce` + mtime in `(adversary_started_at, now)` + verdict_line `grep -qF` in body + drift check + `pre-files.txt` exists + eval value matches state). All 7 pass → `git commit`. Any fail → revert (`git checkout` + scoped clean of new files via pre/post diff), mark round `gate-failed`. With attacks: convert each to a verification (regression test, worst-case benchmark input, or added rubric criterion) and re-eval. Any verification fails → revert. Black-box eval with no augmentation surface: log attack as `provisional-flag`, keep but mark.
+5. **Confirm** — no attacks: run commit-gate (INVARIANTS rule #2, 7 checks: `adversary.txt` non-empty + header block nonce matches `state.adversary_nonce` + mtime in `(adversary_started_at, now)` + verdict_line `grep -qF` in body + drift check + `pre-files.txt` exists + eval value matches state). **If `--code-review=on`** (rule #12), also run `codex review --uncommitted -c 'model_reasoning_effort="high"'` and add 8th check: `codex-review.txt` non-empty AND no `[P1]`/`[P2]` markers. All checks pass → `git commit`. Any fail → revert (`git checkout` + scoped clean of new files via pre/post diff), mark round `gate-failed`. With attacks: convert each to a verification (regression test, worst-case benchmark input, or added rubric criterion) and re-eval. Any verification fails → revert. Black-box eval with no augmentation surface: log attack as `provisional-flag`, keep but mark.
 6. **Place** — K=1 mode: replace champion if better, else revert. K>1 mode: replace THIS cell's incumbent only if it beats that cell's score. New cell label → seed that cell.
 7. **Record** — append to History: kept/reverted/error, cell, adversary-result, metric delta.
 8. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
@@ -245,6 +245,8 @@ Override via `--adversary=<value>`:
 **Header-block protocol (v2.8 anti-fabrication).** Before each adversary call, the mutator generates a fresh `nonce` (16 hex via `secrets.token_hex(8)`) and `started_at` (ISO ms) and writes both into `state.rounds[N].{adversary_nonce, adversary_started_at}`. The prompt instructs the subagent to write a mandatory header block (`ABELIAN-ADV-v1` + run_id + round + peer + nonce + started_at + verdict, then `---`, then attacks) as the first lines of the output file. Commit-gate verifies nonce match + mtime in valid range + verdict in body. INVARIANTS rule #11. This is friction-level defense (not cryptographic) targeting Threat-1: post-compaction "forgot to call adversary" silent fabrication. A mutator must now cat state.json to find the nonce, which triggers cat INVARIANTS, which surfaces "must actually call adversary."
 
 **Adversary's job:** find what breaks, NOT propose alternatives. Cannot endorse, only attack.
+
+**Code Review supplemental layer (`--code-review=on`, v2.11+)**: orthogonal to the adversary call above, abelian can run codex CLI's purpose-built `codex review --uncommitted` as an additional gate before commit (INVARIANTS rule #12). This is a code-quality layer using codex's built-in P1/P2/P3 severity schema — different from rule #1's domain-specific attack-class adversary. Output to `round-N/codex-review.txt` (no header block — rule #11 does not apply to this file). Commit-gate adds 8th check when enabled: no `[P1]`/`[P2]` markers in codex-review.txt. Use for ship-prep, PR-level decisions, security-sensitive mutations. Default off because cost roughly doubles per round.
 
 **Graceful degradation (loud, never silent):**
 - `--adversary=codex` + codex CLI unavailable (binary missing OR `~/.codex/auth.json` absent OR codex MCP wrapper not configured) → degrade to `dissect`, **write notice in 3 places**: console (stderr), `abelian/escalations.md`, and History row for the affected rounds. Continue loop.
