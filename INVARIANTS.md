@@ -140,10 +140,58 @@ This applies to:
 - `--adversary=off` + Eval=`self-judge` → **hard refuse to start**.
   No degradation path. Zero LLM check on vibes eval = structurally
   unsafe.
-- Self-judge MUST verify external schema (file paths, columns, API
-  contracts, function signatures) by reading actual source before
-  scoring (v2.2 schema-grounding). Self-judge that scored ≥ rubric_max
-  without grounding step is auto-rescored to 0 on affected dimensions.
+
+- **Concrete-ground self-judge** (default, v2.2): self-judge MUST verify
+  external schema (file paths, columns, API contracts, function
+  signatures) by reading actual source before scoring. Self-judge that
+  scored ≥ rubric_max without grounding step is auto-rescored to 0 on
+  affected dimensions.
+
+- **Fuzzy-ground self-judge** (v2.14, for doc / research / audit /
+  decision tasks): when Target produces prose, design rationale, decision
+  rec, or research output where "external schema" does NOT exist as
+  concrete files / columns / signatures, schema-grounding adapts as
+  below. The metric stays testable (rubric score with quote-grep gate);
+  abelian's positioning requires it. Tasks that cannot articulate any
+  ground source are out of scope for abelian — use ce-brainstorm or
+  human discussion.
+
+  **Required**: program.md MUST declare ≥1 ground source upfront, in a
+  new `Eval ground:` section. Eligible sources:
+
+  - (a) program.md `Goal` and `Constraints` sections themselves
+    (self-ground — but Goal is one sentence per the program.md schema,
+    so option (a) is **insufficient alone**: must be paired with at
+    least one of (b)/(c)/(d) below);
+  - (b) a user-supplied reference doc, cited by absolute path;
+  - (c) an existing canonical doc in the repo (prior compound doc,
+    README, ARCHITECTURE.md, prior `docs/solutions/` entry), cited by
+    path;
+  - (d) the verbatim user message that initiated the campaign, copied
+    into the program.md `Eval ground:` section as a fenced block.
+
+  **Quote-grep gate** (replaces vibes-grounding): self-judge MUST, for
+  each rubric dimension, either:
+  - Provide a verbatim or paraphrased quote from the ground source that
+    supports the claim being scored (verbatim original phrase MUST be
+    cited alongside any paraphrase), OR
+  - Mark the dimension `not-traceable` → that dimension scored 0.
+
+  Claims in the deliverable that contradict the ground source → entire
+  round flagged `fuzzy-ground-violation`, treated as gate-fail (revert).
+  No "almost-traces"; the gate is binary.
+
+  **Why mandatory**: without a declared ground, "self-judge against
+  program.md" can quietly drift into "self-judge against my interpretation
+  of program.md," which is unilateral self-justification (rule #13's
+  same-prior collapse, applied to evaluation). The forced-upfront
+  declaration makes the trace verifiable post-hoc and gives the adversary
+  a concrete attack surface ("you claimed X; the ground source says Y").
+
+  **Anchor**: see TODO.md "v2.13 → future: abelian-specific gaps surfaced
+  by dry-run" (Stephen 2026-04-29) for the originating gap report. The
+  protocol above is the resolution.
+
 - Self-judge runs in isolated subagent, no shared context with mutator.
 - Rubric frozen in `program.md` Metric BEFORE loop starts; mid-run
   rubric drift forbidden.

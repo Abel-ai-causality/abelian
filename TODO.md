@@ -109,22 +109,24 @@ features remain considered for borrow. Priority by abelian-fit:
 - **Stop / Resume / Abandon** — only relevant if abelian truly runs 4h+ long-horizon campaign and gets interrupted.
 - **"Never push to remote"** — explicit safety rule for autonomous loop. Quick add (1 line in INVARIANTS or Safety Rules section).
 
-## v2.13 → future: abelian-specific gaps surfaced by dry-run (Stephen 2026-04-29)
+## v2.13 → future: abelian-specific gaps surfaced by dry-run (Stephen 2026-04-29) — RESOLVED in v2.14
 
 Dry-run of abelian co-research on a doc-task (1-page abelian-vs-night-shift
-selector) surfaced 3 fundamental gaps NOT addressed by NS-borrowable list:
+selector) surfaced 3 fundamental gaps. All 3 resolved in v2.14 (this commit)
+after peer-B R1+R2 cross-attack rounds (`/tmp/peer-b-attack.md`,
+`/tmp/peer-b-attack-r2.md`).
 
-- **Schema-grounding for fuzzy ground sources** (rule #8 extension) — current rule #8 assumes structured external source (file/column/API/signature) exists for self-judge to verify against. Doc-tasks where "ground truth" is fuzzy (e.g., user-fit judgment, narrative coherence, decision quality) need explicit fuzzy-ground protocol: which textual source counts as ground? Is it the program.md Goal restatement? User-supplied reference doc? Confirms peer-B F5.1.
-- **Doc-task cross-attack quality** — co-research peers attacking each other's prose (markdown drafts) tends to degenerate into "prefer my style" rather than "find what breaks". Code-diff cross-attack has clear failure modes (test fail / type error / regression); doc-diff has none. Needs cross-attack template specifically for prose: what's a "real attack" on a doc?
-- **Attack-class library by domain** — 7 default + per-program domain-specific is trial-and-error per user. Need shipped libraries:
-  - research-class: selection-bias / overfit / regime-shift / look-ahead / target-leakage / replication-failure
-  - audit-class: confirmation-bias / motivated-reasoning / cherry-pick / strawman
-  - decision-class: sunk-cost / loss-aversion / availability-heuristic / scope-creep
-  - doc-class: scope-drift / hidden-assumption / definition-elasticity / authority-by-citation
-  Without library, every program.md author re-invents domain-specific attack classes inconsistently.
+- ~~**Schema-grounding for fuzzy ground sources** (rule #8 extension)~~ — resolved: INVARIANTS rule #8 expanded with **Fuzzy-ground self-judge** subsection. New `Eval ground:` declaration in program.md (≥1 of (b)/(c)/(d); option (a) self-ground supplementary only). Quote-grep gate replaces vibes-grounding; untraced dimensions auto-scored 0; contradictions flag round `fuzzy-ground-violation` and revert.
+- ~~**Doc-task cross-attack quality**~~ — resolved: SKILL.md Co-Research Mode gains **Doc-task cross-attack** subsection. Five-criterion attack form with mandatory falsification statement (`"this is wrong if X, because the doc claims Y"`, X must be grep-able / runnable / countable; aesthetic / tone / rigor X auto-rejected). After 2 re-spawn failures, escalates to dispatched-single-adversary mode with `state.rounds[N].coresearch_degraded: true` provenance.
+- ~~**Attack-class library by domain**~~ — resolved: SKILL.md Attack Class Checklist gains **Attack Class Library** subsection. 4 named libraries (research-class R1–R6; audit-class A1–A4; decision-class D1–D4; doc-class C1–C4) plus existing code-domain extensions. Namespace discipline reserves `*-class` suffix for libraries. New `task:` field in program.md drives mandatory-library check; loud-warn on absent field (defaults to `task: code` for v2.5 backwards-compat).
 
-These 3 gaps are **higher priority than NS-borrowable backlog** for abelian's
-positioning (deep + innovative + long-horizon + tractable doc + testable
-metric). Without them, doc-task / research-task / decision-task users
-encounter friction not found in code-tasks.
+Verdict trail: v2.14 draft v1 (peer-B R1: MAJOR-REVISION-REQUIRED, 4
+BLOCKERS / 4 MAJORS / 3 MINORS) → draft v2 (peer-B R2: ACCEPT-WITH-FIXES,
+1 NEW BLOCKER / 2 NEW MAJORS / 2 NEW MINORS) → v2.14.0 commit (NEW
+BLOCKER 1 resolved via loud-warn pattern; NEW MAJOR 1 via grep-able-X
+requirement; NEW MAJOR 2 via `coresearch_degraded` schema field).
+
+Positioning preserved: `adversarial collaboration on deep + innovative +
+long-horizon iteration with tractable doc + testable metric`. Tasks with
+no testable metric remain out of scope (use ce-brainstorm).
 

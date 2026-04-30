@@ -85,7 +85,7 @@ These rules are **scaffolding** — not adversarial-collaboration-specific, but 
 5. **Pre-files snapshot** — `git ls-files` inventory before mutate (round-level revert tax)
 6. **Forbidden termination rationales** — 5 stopping-preferences refused as reasons; loop runs till mechanism converge (no rounds/budget cap)
 7. **Verbatim Goal/Target/Constraints** in adversary prompts (no paraphrasing)
-8. **Self-judge discipline** — schema-grounding required; `--adversary=off` + self-judge hard-refused
+8. **Self-judge discipline** — schema-grounding required: concrete (file/column/API/signature) for code; fuzzy-ground via `Eval ground:` declaration + quote-grep gate for doc/research/audit/decision tasks (v2.14). `--adversary=off` + self-judge hard-refused
 9. **Execution gate** — adversary-exhaustion alone is necessary but not sufficient
 10. **Production-runtime safety** — cron/supervisor/watchdog file edits need extra discipline
 11. **Adversary header block** — mandatory `ABELIAN-ADV-v1` format with nonce + timestamp (anti-fabrication friction defense for prompt-inject dispatch)
@@ -165,12 +165,15 @@ Abelian runs **till converge** — no `--rounds` flag, no `--budget` flag. Mecha
 
 ## Status
 
-v2.13.0 (2026-04-29). Repositioned per 2026-04-29 self-audit dogfood:
+v2.14.0 (2026-04-29). Non-code task readiness — addresses 3 dry-run gaps from doc-task pilot (TODO.md):
 
-- abelian is **adversarial collaboration framework** (Kahneman-style applied to LLM dispatch), parallel to unilateral review frameworks. Co-research mode is framework primary, not optional toggle.
-- 13 INVARIANTS rules are **shared scaffolding** — long-horizon LLM agent loops need this hardening regardless of framework primary; abelian inherits, validates under stricter dual-peer regime.
-- 3 abelian-specific rules (#5 pre-files / #10 production-runtime / #11 nonce header) are **dispatch-architecture tax** for the LLM-pair-via-prompt-inject choice — not universal innovation, honest acknowledged.
-- Claude Code path with dissect adversary smoketested 2026-04-28 in unilateral mode (count_duplicate_pairs). **Co-research mode in deep+innovative+long-horizon profile not yet dogfooded** — first such campaign (real alpha research / paper audit / architecture re-design) IS the framework smoketest.
+- **4 named attack-class libraries** — `research-class` (R1–R6: selection-bias / overfit / regime-shift / look-ahead / target-leakage / replication-failure), `audit-class` (A1–A4), `decision-class` (D1–D4), `doc-class` (C1–C4: scope-drift / hidden-assumption / definition-elasticity / authority-by-citation). New `task:` field in program.md (`code | research | audit | decision | doc | mixed`); non-code tasks must opt in to ≥1 library. Loud-warn on absent field (v2.5 backwards-compat). Namespace discipline reserves `*-class` suffix.
+- **Doc-task cross-attack** (Co-Research Mode subsection) — 5-criterion attack form with mandatory falsification statement (`"this is wrong if X, because the doc claims Y"`). X must be grep-able / runnable / countable; aesthetic / tone / rigor X auto-rejected. Closes "peers prefer my style" degeneration on prose targets. Failure-mode escalation dispatches new adversary subagent (preserves rule #13), records `state.rounds[N].coresearch_degraded: true` for provenance.
+- **INVARIANTS rule #8 fuzzy-ground extension** — `Eval ground:` declaration in program.md (≥1 of: user-supplied reference doc / canonical repo doc / verbatim initiating user message; Goal-as-ground supplementary only). Quote-grep gate replaces vibes-grounding; untraced rubric dimensions auto-scored 0; contradictions flag round `fuzzy-ground-violation` and revert.
+- **Positioning preserved** — removed v1 draft's `unscoreable-fuzzy-ground` + human-acceptance-count escape mid-cross-attack. Tasks with no testable metric stay out of scope (route to ce-brainstorm). The deletion converged independently with peer-B R1 BLOCKERs against rule #6 / #9 collisions.
+- **First co-research dogfood on doc-task** — v2.14 itself shipped via the protocol it ships. peer-B R1 (MAJOR-REVISION-REQUIRED, 4 BLOCKERs / 4 MAJORs / 3 MINORs) → v2 (ACCEPT-WITH-FIXES, 1 NEW BLOCKER / 2 NEW MAJORs / 2 NEW MINORs) → commit, all resolved with grep-able evidence in attack files. The `feedback_invented_empirical_anchors_is_a4_strawman.md` lesson came out of this cycle.
+
+v2.13.0 (2026-04-29). Repositioned as **adversarial collaboration framework** (Kahneman-style applied to LLM dispatch); 13 INVARIANTS rules are **shared scaffolding** for long-horizon LLM agent loops; 3 abelian-specific rules (#5 / #10 / #11) are **dispatch-architecture tax** for the LLM-pair-via-prompt-inject choice. Claude Code unilateral path smoketested 2026-04-28 (count_duplicate_pairs).
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 ---
 name: abelian
-version: 2.13.0
+version: 2.14.0
 description: >
   **Adversarial collaboration framework** (Kahneman-style applied to LLM
   dispatch) for deep, innovative, long-horizon iteration with tractable
@@ -49,6 +49,15 @@ description: >
   **Target should include executable artifacts whenever possible —
   spec-only is the degraded mode for both modes.**
 
+  **v2.14 — non-code task readiness**: attack-class libraries by domain
+  shipped (research-class / audit-class / decision-class / doc-class);
+  doc-task cross-attack template with falsification-form requirement;
+  fuzzy-ground protocol (INVARIANTS rule #8 extension) for tasks where
+  ground is prose / decision / research output rather than code / schema.
+  Non-code campaigns declare `task:` field and ≥1 library; tasks with no
+  testable metric remain out of scope (positioning preserved: tractable
+  doc + testable metric).
+
   Use when user says "abelian", "autoloop", "auto-optimize", "run experiments",
   "optimize this", or "Karpathy loop". The skill name is historical (covers
   unilateral verification too despite "research" framing); future v3.0 may flip
@@ -71,13 +80,15 @@ Mutate → evaluate → **adversary** → keep/revert → repeat. When done, lea
 A `program.md` with these sections:
 
 - **Goal** — one sentence
+- **Task class** *(v2.14)* — one of `code | research | audit | decision | doc | mixed`. Determines mandatory Attack Classes coverage (see "Attack Class Library" below). If absent, loop emits LOUD WARNING (console + `escalations.md` + `state.json` + History row) and defaults to `task: code` for backwards-compat with v2.5+ program.md — same loud-degradation pattern as `--adversary=codex` graceful fallback. The warning explicitly invites the author to add the field; absent-field is operational, not refusal-to-start, but it is loud. For `task: mixed` campaigns (e.g., a code refactor that also rewrites the README), declare a primary class on the first line and supplementary classes after a `;`: `task: code; doc` — the loop applies BOTH library mandates.
 - **Target** — files the agent may edit
-- **Eval** — shell command outputting a number (preferred) OR `self-judge` with a frozen rubric
-- **Metric** — name, direction (min|max), baseline
+- **Eval** — shell command outputting a number (preferred) OR `self-judge` with a frozen rubric. For non-`code` task classes, see INVARIANTS rule #8 fuzzy-ground protocol — `Eval ground:` declaration required.
+- **Eval ground** *(v2.14, required for non-`code` task classes per INVARIANTS rule #8)* — declared ground source(s): ≥1 of (b)/(c)/(d) options from rule #8; option (a) self-ground is supplementary only.
+- **Metric** — name, direction (min|max), baseline. Testable per positioning — rubric score, count, coverage rate, runtime; not vibes / human-acceptance-only. Tasks that cannot articulate a testable metric are out of scope for abelian (use ce-brainstorm or human discussion).
 - **Constraints** — what NOT to do
 - **Strategy** — what to try, in what order
 - **Cells** *(portfolio mode only)* — diversity axes you want covered (e.g., "memoization", "algorithm-swap", "data-restructure"). Free-text labels.
-- **Attack Classes** *(v2.5)* — taxonomy of attack vectors the adversary MUST address each round (or explicitly mark `n/a-this-target`). Default 7 classes apply; add domain-specific ones. Closes "single-adversary single-frame exhaustion" gap. See "Attack Class Checklist" section below.
+- **Attack Classes** *(v2.5, expanded v2.14)* — taxonomy of attack vectors the adversary MUST address each round (or explicitly mark `n/a-this-target` with grep-able trace). Default 7 classes always apply; non-`code` tasks MUST opt in to ≥1 named library (research-class / audit-class / decision-class / doc-class). See "Attack Class Library" section below.
 - **History** — auto-populated by the loop
 
 ## Pre-Flight (v2.8)
@@ -143,6 +154,7 @@ Minimal schema:
       "adversary_nonce": "a3f2c8e9d1b40756",
       "adversary_started_at": "2026-04-28T14:32:18.421-0700",
       "pre_files_file": "round-1/pre-files.txt",
+      "coresearch_degraded": false,
       "commit": "def5678",
       "started_at": "2026-04-28T14:31:10-0700",
       "ended_at": "2026-04-28T14:34:55-0700"
@@ -384,6 +396,98 @@ When codex CLI unavailable at startup → degrade to `claude-opus,claude-opus
 + different context`, NOT to `claude-opus,claude-haiku`. Loud notice
 in console + escalations.md (same protocol as unilateral).
 
+### Doc-task cross-attack: making prose attackable (v2.14)
+
+Code-diff cross-attack has clear failure modes (test fail / type error /
+regression). Doc-diff has none — peers attacking each other's prose
+naturally degenerate into "I prefer my style," which is unilateral self-
+attack disguised as cross-review (rule #13's same-prior collapse, applied
+to evaluation rather than mutation).
+
+A "real attack" on a doc must satisfy ALL FIVE criteria:
+
+1. **Concrete** — cite the specific line / paragraph / claim being attacked
+   (line N or quoted phrase verbatim).
+2. **Falsifiable** — the attack states what would have to be true for the
+   doc to be wrong, in a form the author can verify or refute.
+3. **Class-grounded** — labeled with a doc-class attack class (C1–C4 from
+   the Attack Class Library) or another named class.
+4. **Explicit falsification statement with grep-able / runnable / countable X**
+   — every attack MUST include a sentence in the form
+   `"this is wrong if X, because the doc claims Y"`, where:
+   - X is one of: (a) a grep-able quote/pattern in the doc or another
+     file (e.g., `grep -F "foo" file.md returns 0 hits`), (b) a shell
+     command output (e.g., `running scripts/check.py exits ≠ 0`), (c) a
+     count/measurement (e.g., `the doc has 3 sections claiming Z but
+     only 1 has supporting evidence`), or (d) a verifiable factual claim
+     about external state (e.g., `numpy 2.0 removed np.foo per
+     numpy/numpy#1234`).
+   - X is NOT: aesthetic preference, reader hypothesis ("a reader cannot
+     follow"), tone judgment, rigor judgment, "feels" / "seems" /
+     "unclear" / "hard-to-follow" / "muddled" / "lacks rigor" / "could be
+     clearer" / variants thereof.
+   - Y is a verbatim or paraphrased quote from the doc, with the doc's
+     line number cited.
+5. **Resolvable** — the doc author can either (a) accept and edit, (b)
+   point to where the doc already addresses the attack, or (c) explicitly
+   defer with rationale. "I disagree" without one of these three is invalid.
+
+**Cross-attack prompt template (co-research peer dispatch, doc-task)**:
+
+> You are reviewing peer-A's draft of [doc target, path]. Your job is to
+> find what BREAKS, not what you would have written differently. Apply the
+> doc-class attack library (C1–C4) plus any program.md domain extensions.
+>
+> For each attack, output exactly this structure:
+>
+> ```
+> [class label, e.g., C1 / C2 / domain-name]
+> Cite: <line N or "quoted phrase">
+> Falsification: this is wrong if <X — grep-able / runnable / countable observation>, because the doc claims (line M) <Y verbatim>
+> Severity: BLOCKER | MAJOR | MINOR
+> Resolution: <accept-and-edit | already-addressed-at-line-N | defer-with-rationale>
+> ```
+>
+> Empty attack list is acceptable IFF every C1–C4 was concretely probed
+> against the draft AND the n/a reason includes a **grep-able trace**, not
+> a bare assertion. Example acceptable: `C1 n/a — grep -nE "scope|expand|
+> beyond" draft.md returned only Goal-declared entries at lines 12–18`.
+> Example rejected: `C1 n/a — no scope drift`.
+
+**Forbidden in attacks** (orchestrator auto-rejects round; respawn required):
+- Any attack lacking the explicit "this is wrong if X, because Y" form
+  (criterion 4) — this is the structural defense; literal-string filters
+  on phrases like "could be clearer" are bypassable, the form requirement
+  with grep-able / runnable / countable X is not.
+- X reduces to aesthetic / reader-experience / tone / rigor judgment, even
+  when wrapped in the falsification form.
+- Class label without falsification statement.
+- n/a-this-target without grep-able trace.
+
+**Failure modes**:
+
+- Peer returns >50% attacks failing criterion 4 → re-spawn with explicit
+  "criterion 4 violation, retry with grep-able / runnable / countable X
+  required."
+- After 2 re-spawn failures on the same peer → escalate
+  (`escalations.md`, mark doc-task `cross-attack-degenerate`) AND switch
+  to **dispatched-single-adversary mode**: orchestrator dispatches a
+  brand-new adversary subagent (`Agent + Skill('dissect')` or
+  `codex exec` subprocess), writing nonce-headered `adversary.txt` per
+  rule #11. State.json records this round with
+  `state.rounds[N].coresearch_degraded: true` for post-campaign provenance.
+  This is unilateral mode (rule #1 + rule #11 + rule #8 self-judge gate
+  all active), NOT mutator-attacks-own-propose-in-conversation (forbidden
+  by rule #13). Escalation acknowledges co-research has degenerated for
+  this round; it does NOT relax the dispatched-adversary requirement.
+
+**Applies to**: SKILL.md edits, program.md drafts, design docs, proposal
+docs, plan files, decision recs, research-output writeups.
+
+**Does NOT apply to**: code-diff (use default 7 + code-domain extensions),
+executable specs (use research-class + execution gate per rule #9), data
+analysis output (use research-class + audit-class).
+
 ### Goal-driven termination (replaces adversary-exhaustion)
 
 Co-research terminates on:
@@ -441,11 +545,93 @@ to mark `n/a-this-target`). Missing class = round not complete.
 | 6 | **unauth surface info-leak** | `/health` over-share, error messages reflecting input, 404 echoes user-controlled `id` |
 | 7 | **error-path / log-poisoning** | control-char injection, oversized input reflection, traceback leaking secrets/paths |
 
-### Domain-specific extensions (add in `program.md` Attack Classes section)
+### Attack Class Library (v2.14, named domain taxonomies)
+
+Beyond the default 7, abelian ships named libraries for non-code domains.
+Without a library, attack-class coverage varies per author and per campaign
+(TODO.md gap #3, "trial-and-error per user"); a named library standardizes
+the address-list so coverage doesn't depend on what the program.md author
+happened to think of.
+
+Each library is opt-in. Cite by name in `program.md` Attack Classes section
+as a list:
+
+```markdown
+## Attack Classes
+- default
+- doc-class
+- research-class
+- regime-shift-2026Q1     # custom domain-specific
+- liquidity-cliff         # custom domain-specific
+```
+
+**Migration**: existing program.md Attack Classes sections written under
+v2.5 syntax (bullet list of strings) remain valid and are treated as
+`[default] + <listed bullets>`. Library names are new identifiers; the
+list-of-strings grammar is unchanged.
+
+**Namespace discipline** (NEW v2.14): the four library identifiers
+(`research-class`, `audit-class`, `decision-class`, `doc-class`) and any
+future `*-class` suffix are RESERVED. Custom domain-specific extensions
+must NOT use the `*-class` suffix (collision risk: a v2.5 program.md that
+named a custom extension `audit-class` for an unrelated auditing concern
+now ambiguously triggers v2.14's audit-class library mandate). On v2.14
+migration, rename custom-class collisions to `<domain>-custom`,
+`<domain>-extension`, or another scheme. Loop refuses to start when a
+custom name in Attack Classes matches a reserved library identifier
+unless explicit `--accept-reserved-name-collision` flag passed.
+
+#### research-class (6 classes, for empirical investigation / data analysis)
+
+| # | Class | What to probe |
+|---|---|---|
+| R1 | **selection-bias** | sample selection process, survivorship effects, any filter that conditions on the outcome variable |
+| R2 | **overfit** | in-sample tuning vs out-of-sample test, hyperparameter search degrees of freedom, multiple-comparisons inflation |
+| R3 | **regime-shift** | training distribution vs deployment distribution, structural breaks, non-stationarity |
+| R4 | **look-ahead** | future information leaking into past features, temporal join correctness, t+1 features used at t |
+| R5 | **target-leakage** | target's own derivative used as a feature (proxy variable), train/val contamination via shared keys |
+| R6 | **replication-failure** | does the result hold on independent data / different seed / different operationalization, or sample-specific |
+
+#### audit-class (4 classes, for review / verification of prior claims)
+
+| # | Class | What to probe |
+|---|---|---|
+| A1 | **confirmation-bias** | did the analyst frame queries to find evidence FOR a held belief? what alternative would have falsified the conclusion |
+| A2 | **motivated-reasoning** | does the analyst have stake in the outcome? are negatives soft-pedaled |
+| A3 | **cherry-pick** | reported subset vs underlying population — was anything excluded without justification |
+| A4 | **strawman** | does the prior claim being audited match what the original author actually wrote (verbatim grep), or a softer version |
+
+#### decision-class (4 classes, for high-stakes choice under uncertainty)
+
+| # | Class | What to probe |
+|---|---|---|
+| D1 | **sunk-cost** | does the recommendation justify keeping prior commitment because of past investment alone |
+| D2 | **loss-aversion** | is the recommendation systematically conservative because losses loom larger than gains, asymmetrically with the actual payoff distribution |
+| D3 | **availability-heuristic** | is the example set memory-of-recent-events vs base-rate-representative |
+| D4 | **scope-creep** | does the proposed action stretch beyond the stated decision boundary (e.g., "fix bug" turns into "redesign module") |
+
+#### doc-class (4 classes, for prose / spec / proposal documents)
+
+| # | Class | What to probe |
+|---|---|---|
+| C1 | **scope-drift** | does the doc's claim/proposal exceed what the Goal section authorized — added requirements, larger surface, broader audience |
+| C2 | **hidden-assumption** | what unstated **logical/conceptual** premise must hold for the doc's conclusion to be true; cite the line where the assumption hides. Distinct from default class #5 layout-sensitive (which covers physical/encoding/format premises). When doc contains code samples, BOTH must be probed. |
+| C3 | **definition-elasticity** | does a term shift meaning between sections (e.g., "user" = end-user in §1, = developer in §3) — break the chain |
+| C4 | **authority-by-citation** | a claim is supported by citing X without checking X actually says it; or appeal to "best practice" without source |
+
+#### Code-domain extensions (existing, unchanged)
+
 - **Code-speedup campaigns**: `bit-identity-vs-baseline`, `override-hook-preservation`, `cache-key-completeness`, `cache-eviction-bounded`
 - **API service campaigns**: `subprocess command injection`, `path traversal beyond suffix check`, `symlink escape from sandbox dir`
 - **Data pipeline campaigns**: `schema drift`, `null/missing-value handling`, `unicode normalization`, `timezone semantics`
-- **ML training campaigns**: `target leakage`, `train/val contamination`, `regime mismatch`, `bootstrap stability`
+- **ML training campaigns**: prefer **research-class** (R1–R6 covers train/val contamination, regime mismatch, target leakage); add domain extensions on top as needed
+
+**Library opt-in is mandatory for non-code tasks.** The `task:` field in
+program.md (see "What You Need" above) declares task class. Loop refuses
+to start when `task != code` AND Attack Classes does not list at least
+one non-default library. Existing v2.5 program.md without `task:` field
+defaults to `task: code` — backwards-compat — but emits a loud warning
+(see "What You Need").
 
 ### Adversary prompt requirement (loop enforces)
 The Agent prompt for each round MUST include:
