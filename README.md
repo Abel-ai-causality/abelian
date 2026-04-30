@@ -74,7 +74,7 @@ For each round:
 
 When termination fires, the orchestrator runs a mandatory post-campaign escalation review (asks the adversary "what was deferred?") and writes a locked-template compound doc to `docs/solutions/[category]/[goal-slug]-[date].md`. Future runs on the same target read that doc first — **each run starts where the last one ended**.
 
-## The 12 INVARIANTS
+## The 13 INVARIANTS
 
 These rules live in `INVARIANTS.md` and are re-read at the start of every round. Skipping any of them is a protocol violation, not an optimization:
 
@@ -90,6 +90,7 @@ These rules live in `INVARIANTS.md` and are re-read at the start of every round.
 10. **Production-runtime safety** — cron/supervisor/watchdog file edits need extra discipline
 11. **Adversary header block** — mandatory `ABELIAN-ADV-v1` format with nonce + timestamp
 12. **Code Review supplemental gate** *(opt-in, `--code-review=on`)* — `codex review --uncommitted` as additional code-quality gate; output to `codex-review.txt`; commit refused if `[P1]` or `[P2]` markers present
+13. **Self-attack is not adversary** *(v2.12)* — conversation-level "I attacked my own propose" with no spawn / no isolated context / no nonce header is unilateral self-judge (rule #8 degraded mode), not co-research. ≥3 mutation proposals or protocol-level changes trigger hard requirement to spawn dispatched adversary before verdict. RLHF prior overlap empirically validated 17× catch-rate gap (2026-04-29 self-audit dogfood)
 
 Full text in [INVARIANTS.md](INVARIANTS.md).
 
@@ -185,7 +186,7 @@ Abelian's niche: **bounded campaigns with deterministic eval and strict survive-
 
 ## Status
 
-v2.11.0 (2026-04-28). codex CLI subprocess is the canonical path; codex MCP is optional alternative if user has a wrapper. v2.11 adds `--code-review=on` opt-in supplemental gate using `codex review --uncommitted` (INVARIANTS rule #12) — verified locally that `codex review` is functional via bun shim, but not yet smoketested against an abelian campaign.
+v2.12.0 (2026-04-29). codex CLI subprocess canonical; codex MCP optional. v2.11 added `--code-review=on` opt-in (rule #12) — codex review verified via bun shim, abelian-campaign smoketest pending. **v2.12 adds INVARIANTS rule #13** (self-attack is not adversary) — closes the meta-task enforcement hole where conversation-level audit / propose / verdict on abelian itself was bypassing co-research default. 2026-04-29 self-audit dogfood confirmed peer-A self-attack found 1/17 attacks vs spawned peer-B Agent — 17× catch-rate gap forced explicit rule.
 
  Claude Code path with **dissect adversary** smoketested 2026-04-28 (count_duplicate_pairs campaign — full v2.8 protocol exercised). **codex CLI subprocess path** is functional locally (codex CLI installed + auth'd via `~/.codex/auth.json`) but not yet dogfooded against an abelian campaign — first run of `--adversary=codex` will be the smoketest. **codex MCP wrapper path** (optional alternative) is not maintained by abelian; if you have a wrapper configured, the orchestrator may use it. **Codex CLI primary driver** invocation form un-tested by external user — see [TODO.md](TODO.md).
 

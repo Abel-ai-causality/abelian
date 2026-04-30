@@ -1,6 +1,6 @@
 ---
 name: abelian
-version: 2.11.0
+version: 2.12.0
 description: >
   **Umbrella name for two distinct iteration modes** sharing common
   anti-collapse + anti-compaction infrastructure (portfolio, escalation,
@@ -31,6 +31,18 @@ description: >
   a collapse vector for non-trivial work" — SKILL.md's own prior wording).
   Switch to unilateral with --mode=unilateral when the task is genuinely
   single-axis verification.
+
+  **Skill activation rule (v2.12, INVARIANTS rule #13)**: any conversation-
+  level reference to this skill — campaign or meta-audit — that involves
+  ≥3 mutation proposals, protocol-level changes, or "verdict / done / keep
+  / revert / accept / pareto / trade-off" vocabulary applied to mutation
+  evaluation triggers a hard requirement: spawn dispatched adversary (Agent
+  + Skill('dissect') OR codex exec subprocess) BEFORE reaching verdict.
+  Self-attack in conversation context is unilateral self-judge (rule #8
+  degraded mode), not co-research. RLHF prior overlap means mutator and
+  self-attacker share the same prior over BOTH "what to mutate" and "how
+  to attack mutations" — empirical 17× catch-rate ratio (peer-B vs
+  self-attack, 2026-04-29 self-audit) confirms severity.
 
   **Target should include executable artifacts whenever possible —
   spec-only is the degraded mode for both modes.**

@@ -297,3 +297,73 @@ than rule #11's nonce protection but better than no gate.
 mutations, code-quality ratchet campaigns. Default off because cost
 doubles per round and most campaigns (speedup / refactor) are
 already covered by dissect's attack-class checklist.
+
+## 13. Self-attack is not adversary (v2.12)
+
+A mutator agent attacking its own propose in conversation context
+(no spawn, no isolated context, no nonce header) is unilateral
+self-judge (rule #8 degraded mode), NOT co-research (rule #1 +
+co-research mode default since v2.10). RLHF prior overlap = same-prior
+collapse vector.
+
+**Empirical anchor (2026-04-29 abelian self-audit dogfood)**: peer-A
+(orchestrator Claude) self-attack on 5 mutation propose found 1
+obvious finding (Validate-vs-Eval overlap). Spawned peer-B (Agent +
+Skill('dissect')) on identical input found 17 attacks across 5
+dimensions, including 4 foundational frame challenges peer-A could
+not see (e.g., "abelian vs night-shift cosmetic copy" / "propose+verify
+structurally not fit fuzzy task" / "Phase 2 dogfood polymarket =
+best-fit case sampling bias"). 17 / 1 = 17× catch rate ratio confirms
+RLHF prior overlap is severe — mutator and self-attacker share the
+same prior over BOTH "what to mutate" and "how to attack mutations".
+
+**Trigger**: any conversation-level abelian/autoresearch reference
+that involves ANY of:
+
+- ≥3 mutation proposals (protocol / architecture / strategy / memory)
+- Protocol-level change (INVARIANTS / state.json schema / commit-gate)
+- "verdict / done / keep / revert / accept / pareto / trade-off"
+  vocabulary applied to mutation evaluation
+
+**Required action when triggered**: spawn dispatched adversary (Agent
++ Skill('dissect') OR codex exec subprocess) writing nonce-headered
+adversary file (rule #11) BEFORE reaching verdict. Self-attack in
+conversation context does NOT count.
+
+**Forbidden mode**: "I attacked my own propose and found these issues"
+phrased as adversary substitute. This is mutator's same RLHF prior
+attacking same RLHF prior — by construction, cannot find what the
+prior overlooks.
+
+**Graceful degradation if you genuinely cannot spawn**: write a single
+file `unilateral-self-judge.md` (no nonce header, no rule #11
+protection) with explicit `MODE: unilateral self-judge — degraded;
+rule #1 not satisfied; verdict provisional only` header. Notify in 3
+places (console + escalations.md + conversation log) — same loud-
+degradation pattern as rule #8 / `--adversary=off`.
+
+**Honest scope**: rule #13 has no nonce protection (orchestrator can
+fake the "I'm self-judging" header just like rule #11's adversary
+header). The structural gate IS the spawn requirement; if you skip
+spawn, the only defense is loudness — declare degraded mode + tell
+the user to run co-research peer manually.
+
+**This rule applies even when**:
+
+- Discussing abelian protocol changes (meta-task — do NOT cite
+  `feedback_human_peer_beats_llm_team_for_design_work.md` "small surface
+  design" memory to justify skipping rule #13; that memory covers
+  human-as-peer-B reactive review, not LLM mutator's own self-attack)
+- "Just one quick analysis" / "informal discussion" — these are
+  forbidden-rationale variants of rule #6
+- User asks for your "honest opinion" — opinion ≠ adversary; opinion
+  is mutator output, adversary is dispatched challenge with isolated
+  context
+
+**Anti-pattern caught 2026-04-29**: peer-A used its own freshly-shipped
+memory (`feedback_human_peer_beats_llm_team_for_design_work.md`) to
+retroactively justify skipping co-research, treating Stephen's reactive
+question as "human peer-B substitute". Stephen's question is review,
+not active peer-attack. Real peer-B is a spawned agent with isolated
+context. Self-justification by selectively invoking own memory is the
+exact same-prior collapse rule #13 prevents.
