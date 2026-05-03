@@ -1,6 +1,6 @@
 # Abelian
 
-Adversarial collaboration loop for deep + innovative + long-horizon LLM iteration. Two peers propose AND attack. 17 INVARIANTS. Mechanism-converge termination. Opt-in goal-sharpening for fuzzy missions.
+Adversarial collaboration loop for deep + innovative + long-horizon LLM iteration. **One skill, one loop, one discipline**: every configured peer (default 2) proposes AND attacks every other peer's proposals. 18 INVARIANTS. Mechanism-converge termination. Goal-authoring is a stage of the same loop (auto-detected from `--mission` flag), not a separate mode.
 
 Output = tractable doc + testable metric. Tasks without testable metric → use `ce-brainstorm`.
 
@@ -53,7 +53,7 @@ Termination → post-campaign escalation review writes compound doc to `docs/sol
 
 For single-axis verification: `--mode=unilateral` (1× cost, no peer).
 
-## INVARIANTS (17)
+## INVARIANTS (18)
 
 | # | Rule | Notes |
 |---|---|---|
@@ -73,7 +73,8 @@ For single-axis verification: `--mode=unilateral` (1× cost, no peer).
 | 14 | Mission Thread per round (v2.15) | 7-field block; goal_paraphrase fresh; ≥2 candidate_routes; selection_reason cites trade-offs; mission_relevance traces Takeaway.Validated_by |
 | 15 | Evidence Class enum (v2.15) | adversary header gains `evidence_class:` `theoretical / paper / replay / settled / dry_run / live` |
 | 16 | Program Contract Gate (v2.16) | round-0: hard checklist + Takeaway-as-derived-contract + baseline eval + program-adversary + sha256 hash + TTY-aware confirmation. v2.17 amendment: Strategy=1 allowed when sharpening triage classified `single-axis` AND `--mode=unilateral` |
-| 17 | Adversarial Goal Sharpening (v2.17, opt-in) | `abelian sharpen "<mission>"`: 5-pass protocol (triage + outcome distillation + metric forge + lever surfacing + Takeaway derivation) compiles fuzzy mission to rule #16-compliant program.md draft. Native answer to OKR's hierarchical decomposition |
+| 17 | Goal-Authoring Stage (v2.17, v3.0 fold-in) | `abelian --mission "<text>"`: 5-pass protocol (triage + outcome distillation + metric forge + lever surfacing + Takeaway derivation) compiles fuzzy mission to rule #16-compliant program.md draft. Native answer to OKR's hierarchical decomposition. v3.0 dropped `abelian sharpen` subcommand; goal-authoring is now a stage of the unified loop |
+| 18 | Asymmetric peer discipline (v3.0) | PROPOSE mode: innovative + grounded (cite ≥1 file/command/output, no vibes). COUNTER mode: strictly verification-oriented (convert attack to probe, run, return PASS/FAIL or CONCEDED or NON-CODIFIABLE-ESCALATED). Argumentation without falsification target FORBIDDEN in counter |
 
 Full text: [INVARIANTS.md](INVARIANTS.md).
 
@@ -145,11 +146,12 @@ python3 bench.py | tail -1
 - Constraints: pure stdlib, no numpy (Constraints: cited above)
 ```
 
-Default: co-research (Strategy axes split across peers with different framing). Unilateral verify: `--mode=unilateral`. High-stakes: `--adversary=codex` (cross-family priors). Ship-prep: `--code-review=on`. No `--rounds` / `--budget` flags — mechanism-based termination per rule #6. Manual abort: SIGINT.
+Default peers: `claude+claude` (different context-framing per peer, Claude Code) or `codex+codex` (codex CLI). High-stakes cross-family: `--peers=claude+codex`. Ship-prep: `--code-review=on` (rule #12 supplemental). Fuzzy mission: `abelian --mission "<text>"`. No `--rounds` / `--budget` flags — mechanism-based termination per rule #6. Manual abort: SIGINT. Legacy v2.x flags (`--mode=`, `--adversary=`, `abelian sharpen`) deprecated; see Migration in SKILL.md.
 
 ## Changelog
 
-- **v2.17.0** (2026-05-03) — Adversarial Goal Sharpening (rule #17, opt-in). `abelian sharpen "<mission>"` compiles fuzzy mission to rule #16-compliant program.md draft via 5-pass protocol (triage + outcome distillation + metric forge + lever surfacing + Takeaway derivation), reusing dissect attack classes + co-research peer pair + rule #11 nonce. Native answer to OKR's hierarchical decomposition; uses LLM enumerate-and-attack instead of human cognitive scaffolding. Designed via 2-round co-research with codex; 10 verified findings integrated. Rule #16 A amendment: Strategy=1 allowed when triage classified `single-axis` AND `--mode=unilateral`.
+- **v3.0.0** (2026-05-03) — One skill, one loop, one discipline. Mode lexicon collapse: `--mode=unilateral|co-research`, `--adversary=dissect|codex|both|off`, and `abelian sharpen` subcommand all deprecated. Replaced by `--peers=<config>` (peer-tool selection, not mode), `--mission "<text>"` (fuzzy goal-authoring stage), and unified loop discipline ("every configured peer proposes AND attacks every other peer's proposals"). Rule #1 generalized to "peer challenge output on disk"; rule #11 header `ABELIAN-ADV-v1` → `ABELIAN-PEER-v1` (legacy double-read during deprecation); rule #13 reframed to "self-challenge is not co-research". **Rule #18 (NEW)**: asymmetric peer discipline — PROPOSE mode innovative + grounded; COUNTER mode strictly verification-oriented (probe-or-revert-or-escalate, no argumentation). Rule #16 A v2.17 single-axis exception removed (no unilateral mode to redirect to); single-axis triage exits with reroute diagnostic. Designed via 2-round co-research with codex; converged after Stephen + codex synthesis.
+- **v2.17.0** (2026-05-03) — Adversarial Goal Sharpening (rule #17, opt-in). `abelian sharpen "<mission>"` compiles fuzzy mission to rule #16-compliant program.md draft via 5-pass protocol (triage + outcome distillation + metric forge + lever surfacing + Takeaway derivation), reusing dissect attack classes + co-research peer pair + rule #11 nonce. Native answer to OKR's hierarchical decomposition; uses LLM enumerate-and-attack instead of human cognitive scaffolding. Designed via 2-round co-research with codex; 10 verified findings integrated. Rule #16 A amendment: Strategy=1 allowed when triage classified `single-axis` AND `--mode=unilateral` (v3.0 reverted this exception with mode lexicon collapse).
 - **v2.16.0** (2026-05-03) — Round-0 Program Contract Gate (rule #16). Closes upstream cause: fuzzy program.md leaks fuzz no matter how disciplined per-round gates are. Designed via 2-round co-research with codex (peer-B); 12 verified findings integrated.
 - **v2.15.0** (2026-05-02) — Telos shift to goal-driven co-research. Mission Thread (rule #14), Evidence Class enum (rule #15), Frame-break Protocol replaces plateau-as-termination. Anchor: codex 56-round PM dogfood produced 26 attack-clean rounds with zero metric movement.
 - **v2.14.0** (2026-04-29) — Non-code task readiness. 4 attack-class libraries (research / audit / decision / doc), doc-task cross-attack with falsification form, INVARIANTS rule #8 fuzzy-ground extension.

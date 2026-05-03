@@ -355,3 +355,94 @@ Final spec is integration of all 10 verified findings across 2 rounds, single PR
 ### Why this not OKR
 
 OKR is hierarchical decomposition done by user (KR step requires user cognitive scaffolding). v2.17 is per-field adversarial sharpening done by LLM peer pair + dissect adversary. In LLM era: enumerate-and-attack uses model strength (parallel framings, cross-attack, mechanism surfacing) where OKR's KR step relies on user's structured thinking. night-shift uses OKR upstream of abelian; v2.17 keeps users within the framework.
+
+## v3.0 — Unification + Asymmetric Peer Discipline (2026-05-03)
+
+**Trigger**: hours after v2.17 shipped, Stephen flagged structural creep: "不要多什么sharpen mode 就一个skill abelian 也不要什么dissect mode什么的 就一个mode adversarial collaborate with propose and attack from every party". Plus: "be innovative and grounding when propose, be strictly-verification-oriented when counter the attack". Verified via codex round 1 — codex synthesis: "Stephen substantively right. Proceed with one-mode unification instead of S1-S7 razor as separate PR. v3.0.0 (major bump)."
+
+### Spec landed
+
+**Mode lexicon collapse**:
+
+| v2.x | v3.0 |
+|---|---|
+| `--mode=co-research` (default) | DEPRECATED no-op (warn). Co-research IS the loop. |
+| `--mode=unilateral` | DEPRECATED warn + EXIT. v3.0 has no unilateral mode. Reroute to a different review tool. |
+| `--adversary=dissect` | DEPRECATED warn + map → `--peers=claude+claude` (Claude Code) or `--peers=codex+codex` (codex CLI) |
+| `--adversary=codex` | DEPRECATED warn + map → `--peers=claude+codex` |
+| `--adversary=both` | DEPRECATED warn + map → `--peers=claude+codex` AND `--code-review=on` |
+| `--adversary=off` | REFUSED. abelian without peer challenge is not abelian. |
+| `abelian sharpen "<mission>"` | DEPRECATED. Replace with `abelian --mission "<text>"` flag. |
+
+**Rule renames (peer-general language)**:
+- Rule #1: "Adversary output must be on disk" → "Peer challenge output must be on disk"
+- Rule #11: header magic `ABELIAN-ADV-v1` → `ABELIAN-PEER-v1` (legacy double-read during deprecation)
+- Rule #13: "Self-attack is not adversary" → "Self-challenge is not co-research" (load-bearing distinction is spawned-vs-in-conversation, not the role label)
+
+**NEW rule #18 — Asymmetric peer discipline** (Stephen's directive):
+
+Every peer operates in two modes per round/pass:
+
+- **PROPOSE mode** (generating mutations, candidate routes, outcome distillation, etc.): innovative AND grounded. Innovative = novel framings, mechanism enumeration, NOT safe-incremental restatements. Grounded = ≥1 cited file/command/output (no vibes, no fabrication). Forbidden phrases like "extend X with..." / "refine the existing..." when path is already obvious next step → must mark exploration_round=true with ≥1 speculative route.
+- **COUNTER mode** (responding to attacks on own work): strictly verification-oriented. Options: (a) convert attack to probe + run + return PASS/FAIL evidence (preferred), (b) concede + revert (acceptable), (c) mark non_codifiable + escalation_required (last-resort). Argumentation without probe FORBIDDEN. Counter-mode verdict line must contain "PROBE-PASS" or "PROBE-FAIL" or "CONCEDED" or "NON-CODIFIABLE-ESCALATED".
+
+Why asymmetric: PROPOSE without innovation collapses to "extend last round". PROPOSE without grounding fabricates. COUNTER without strict verification becomes argumentation — peer talks attack down, mutation lands, failure mode unaddressed. The asymmetry is what makes adversarial collaboration deliver quality.
+
+**Goal-authoring stage** (was rule #17 v2.17 separate subcommand, v3.0 fold-in):
+- `abelian --mission "<fuzzy text>"` triggers same propose+attack loop applied to goal-authoring artifact (program.md draft)
+- Bare strings to `abelian` NEVER auto-classified (typo risk)
+- Pass 0 triage `single-axis` outcome: EXIT with reroute diagnostic (v3.0 dropped unilateral; can't run as abelian)
+
+**Rule #16 A v2.17 exception REVERTED**: with unilateral mode dropped, Strategy=1 has no target → universal Strategy ≥2 hard-check. Single-axis missions exit at Pass 0 triage.
+
+### Surface area
+
+| | Count |
+|---|---|
+| New INVARIANTS rule | 1 (rule #18) |
+| Existing rules renamed/generalized | 3 (#1, #11, #13) |
+| Existing rules amended | 1 (#16 A v2.17 exception reverted) |
+| Existing rules folded | 1 (#17 sharpening from subcommand to flag) |
+| Deprecated flags | 7 (`--mode=`, `--adversary=`, `abelian sharpen`) |
+| New flags | 2 (`--peers=`, `--mission`) |
+| Header rename | 1 (`ABELIAN-ADV-v1` → `ABELIAN-PEER-v1`, double-read) |
+| Diff (v3.0 over v2.17) | ~600-800 lines net (mostly rename + rule #18 + migration section) |
+
+### Razor history (codex co-research)
+
+| # | Source | Caught |
+|---|---|---|
+| 1 | Stephen | flagged mode-lexicon proliferation: "ONE mode adversarial collaborate with propose+attack from every party"; added rule #18 directive: "innovative+grounded when propose, strictly verification-oriented when counter" |
+| 2 | peer-A check | confirmed Stephen 80% right + 15% counter-push (backward compat for `--mode=unilateral` users; `--adversary=codex` is peer-config not mode; rename surface heavy) |
+| 3 | peer-B codex round-1 (5 attacks + 6 verdicts) | "stage distinction not mode" (fold sharpening as goal-authoring stage); "no adversary" doesn't remove file-gating (rename, don't erase enforcement); "every party" is wording not N-peer architecture (default 2-peer); fuzzy strings need explicit `--mission` flag (typo risk); `dissect`/`codex` are peer backends not modes; converge on adversarial collaboration umbrella name |
+
+### Backwards compat
+
+Loud-warn-and-route, never silently reinterpret:
+- `--mode=co-research`: warn, no-op (default behavior)
+- `--mode=unilateral`: warn + EXIT (single-axis tasks aren't abelian)
+- `--adversary=X`: warn + map to `--peers=` equivalent (or `--code-review=on` for `=both`)
+- `--adversary=off`: REFUSED (abelian without peer challenge isn't abelian)
+- `abelian sharpen`: warn + map to `abelian --mission`
+- `ABELIAN-ADV-v1` header: legacy-readable for archived runs; new runs emit only `ABELIAN-PEER-v1`. Removed in v3.2.
+
+### What v3.0 does NOT change
+
+- Commit-gate checks 1-11 (rule #18 extends check 8 with PROPOSE-grounding requirement)
+- Mission Thread schema (rule #14)
+- Evidence Class enum (rule #15)
+- Frame-break Protocol 5-step (v2.15)
+- Round-0 Authoring Gate (rule #16 except A amendment)
+- Goal-authoring 5-pass mechanics (rule #17 internals unchanged; only trigger flag changed)
+- "Adversarial collaboration framework" umbrella name (Kahneman-anchored, retained)
+- All empirical anchors
+
+### Why now
+
+v2.0-v2.17 accumulated mode-lexicon proliferation: "unilateral mode + co-research mode + dissect adversary + codex adversary + both adversary + sharpen subcommand + code-review supplemental + ...". Each was justified individually but conceptual surface drifted from "abelian = ONE thing". Stephen's razor: the thing is "adversarial collaboration with mutual propose+attack from every party". Codex agreed. v3.0 collapses surface back to that essence; rule #18 formalizes the propose-vs-counter asymmetry that the loop ALREADY relied on but never named.
+
+### Empirical anchor for rule #18
+
+Codex 56-round trading-internal PM dogfood (2026-05-02): rounds 30-56 had peer-A counter-mode arguments ("the attack assumes X but actually...") that landed without probes; mutations passed gate without verification; mission metric stayed flat. v3.0 rule #18 makes that pattern gate-fail.
+
+PROPOSE-mode innovation gap, same campaign: peer-A `mission_thread.candidate_routes` had ≥2 entries per round but >75% were safe-incremental restatements of prior round's mechanism. Rule #14 required ≥2 entries; rule #18 raises bar to "≥2 entries WITH innovation discipline" (novel framing OR exploration_round + speculative route).

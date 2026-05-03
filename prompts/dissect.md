@@ -77,7 +77,7 @@ header at the very top, before any other content. The field values below
 must match the Round metadata above byte-for-byte:
 
 ```
-ABELIAN-ADV-v1
+ABELIAN-PEER-v1
 run_id: {{RUN_ID}}
 round: {{ROUND}}
 peer: {{PEER}}
@@ -86,6 +86,9 @@ started_at: {{STARTED_AT}}
 verdict: <YOUR ONE-LINE VERDICT HERE>
 ---
 ```
+
+(v3.0 header rename: previously `ABELIAN-ADV-v1`. Commit-gate accepts
+both during deprecation window; new peer calls emit only PEER-v1.)
 
 After the `---` separator, list each Attack Class number with its
 attack-or-n/a verdict + brief evidence. Then the dissect-style review-flags

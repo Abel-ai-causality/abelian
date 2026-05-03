@@ -8,13 +8,18 @@ If you are an LLM running this loop and you find yourself rationalizing
 why a rule below "doesn't apply this time" — that is the exact failure
 mode the rule exists to catch. Stop and re-read.
 
-## 1. Adversary output must be on disk
+## 1. Peer challenge output must be on disk
 
-Each round's adversary call writes `$RUN_DIR/round-N/adversary.txt`
-(unilateral) or `$RUN_DIR/round-N/peer-A.txt` + `peer-B.txt`
-(co-research) BEFORE the call returns. Empty file = adversary was not
-actually run. Conversation-only adversary output is invalid and fails
-commit-gate (rule #2).
+Each round's peer-challenge calls write `$RUN_DIR/round-N/peer-A.txt`
++ `peer-B.txt` BEFORE the calls return. Empty file = peer challenge
+was not actually run. Conversation-only peer output is invalid and
+fails commit-gate (rule #2).
+
+**v3.0 unification**: prior versions (v2.x) had a unilateral mode that
+wrote a single `$RUN_DIR/round-N/adversary.txt` file. v3.0 unifies on
+the two-peer file layout (`peer-A.txt` + `peer-B.txt`); the
+`adversary.txt` filename is legacy-readable for archived v2.x runs but
+no longer produced. See Migration section.
 
 ## 2. Commit-gate (10 always-on checks + 1 conditional, all must pass before `git commit`)
 
@@ -322,30 +327,35 @@ Diagnostic for whether this rule applies: search the cron / supervisor
 config for the Target file path. If found, the rule applies. If
 unsure, suspend cron — cheap insurance.
 
-## 11. Adversary header block (mandatory format)
+## 11. Peer challenge header block (mandatory format)
 
-Every `adversary.txt` (and `peer-A.txt` / `peer-B.txt` in co-research)
-MUST begin with this header block, written by the adversary subagent
-itself, before any attack content:
+Every `peer-A.txt` / `peer-B.txt` MUST begin with this header block,
+written by the challenging peer itself, before any attack content:
 
 ```
-ABELIAN-ADV-v1
+ABELIAN-PEER-v1
 run_id: <state.run_id>
 round: <N>
-peer: unilateral | peer-A | peer-B
-nonce: <state.rounds[N].adversary_nonce>
+peer: peer-A | peer-B | program-gate | sharpen-pass-N
+nonce: <state.rounds[N].peer_nonce>
 started_at: <ISO 8601 with milliseconds>
 verdict: <single-line verdict, identical to state.rounds[N].verdict_line>
 evidence_class: theoretical | paper | replay | settled | dry_run | live
 ---
 <attack content begins here>
 
-[optional, co-research only — v2.15] alternative_routes:
+[optional] alternative_routes:
   - id: <slug>
     mechanism: <one-line description>
     est_metric_delta: <float | "unknown">
     rationale: <why peer would consider this>
 ```
+
+**v3.0 header rename**: previously `ABELIAN-ADV-v1` (v2.0-v2.17).
+Commit-gate accepts BOTH headers during deprecation window — `ABELIAN-PEER-v1`
+preferred (emit only this). Legacy archived runs with `ABELIAN-ADV-v1`
+remain valid for reading. Migration removes legacy support after 2
+minor versions.
 
 `evidence_class` is REQUIRED (v2.15, rule #15). Whitelist:
 - `theoretical` — pure analysis of code/spec without execution
@@ -369,41 +379,40 @@ alternative routes the next round's mutator MAY mine when generating
 8) does NOT validate `alternative_routes` content; this section is
 non-binding informational signal, not a commitment.
 
-**Mutator protocol**:
+**Orchestrator protocol** (per peer challenge call):
 
-1. Before calling `Agent(adversary)`, generate:
+1. Before calling `Agent(peer)`, generate:
    - `nonce = python3 -c "import secrets; print(secrets.token_hex(8))"`
-     (16 hex chars)
+     (16 hex chars, fresh per peer per round)
    - `started_at = $(date +%Y-%m-%dT%H:%M:%S.%3N%z)` (ISO ms)
-   Write both to `state.rounds[N].{adversary_nonce, adversary_started_at}`.
+   Write both to `state.rounds[N].{peer_<slot>_nonce, peer_<slot>_started_at}`.
 
-2. The adversary prompt MUST include `run_id`, `round`, `peer`,
-   `nonce`, `started_at` verbatim and instruct the subagent:
-   > "Write the ABELIAN-ADV-v1 header block (these EXACT field
-   > values) as the first lines of `$RUN_DIR/round-<N>/adversary.txt`,
+2. The peer prompt MUST include `run_id`, `round`, `peer`, `nonce`,
+   `started_at` verbatim and instruct the subagent:
+   > "Write the ABELIAN-PEER-v1 header block (these EXACT field
+   > values) as the first lines of `$RUN_DIR/round-<N>/peer-<slot>.txt`,
    > then `---`, then the attack list. Do not omit the header. Do
    > not change the nonce or started_at."
 
 3. After subagent returns, extract the verdict line from the body
    (or accept it via subagent return value), record in
-   `state.rounds[N].verdict_line`. Commit-gate (rule #2) verifies the
-   header before commit.
+   `state.rounds[N].verdict_line` (or `peer_<slot>_verdict_line` for
+   co-research). Commit-gate (rule #2) verifies the header before commit.
 
-**Honest scope**: this is friction-level defense, not cryptographic.
-A mutator deliberately bypassing the adversary call could fabricate
-the entire header (it just wrote the nonce to state). The header's
-real value is anti-Threat-1 (compaction oversight): an R5+ compacted
-mutator that "forgot" it skipped adversary cannot silently hand-write
-adversary.txt — it must first cat state.json to find the round's
-nonce, which triggers the rule #3 reading reflex (cat INVARIANTS) and
-surfaces rule #1 ("must actually call adversary"). The friction
-converts a silent skip into a deliberate sabotage, and deliberate
-sabotage is loud + traceable in post-campaign review of round
-artifacts.
+**Honest scope**: friction-level defense, not cryptographic. An
+orchestrator deliberately bypassing the peer call could fabricate
+the entire header. The header's real value is anti-Threat-1
+(compaction oversight): an R5+ compacted orchestrator that "forgot"
+it skipped a peer challenge cannot silently hand-write `peer-X.txt`
+— it must first cat state.json to find the round's nonce, which
+triggers the rule #3 reading reflex (cat INVARIANTS) and surfaces
+rule #1 ("must actually call peer"). The friction converts a silent
+skip into a deliberate sabotage, and deliberate sabotage is loud +
+traceable in post-campaign review of round artifacts.
 
-For Threat-2 (deliberate fabrication) and Threat-3 (lazy adversary
-output), see attack-class checklist (program.md) and post-campaign
-escalation review respectively.
+For Threat-2 (deliberate fabrication) and Threat-3 (lazy peer output),
+see attack-class checklist (program.md) and post-campaign escalation
+review respectively.
 
 ## 12. Code Review supplemental gate (opt-in, v2.11+)
 
@@ -465,13 +474,15 @@ mutations, code-quality ratchet campaigns. Default off because cost
 doubles per round and most campaigns (speedup / refactor) are
 already covered by dissect's attack-class checklist.
 
-## 13. Self-attack is not adversary (v2.12)
+## 13. Self-challenge is not co-research (v2.12, generalized v3.0)
 
-A mutator agent attacking its own propose in conversation context
-(no spawn, no isolated context, no nonce header) is unilateral
-self-judge (rule #8 degraded mode), NOT co-research (rule #1 +
-co-research mode default since v2.10). RLHF prior overlap = same-prior
-collapse vector.
+A peer attacking its own propose in conversation context (no spawn,
+no isolated context, no nonce header) is unilateral self-judge (rule #8
+degraded mode), NOT co-research (rule #1 + v3.0 single-loop discipline
+where each peer challenge runs as a spawned subagent). RLHF prior
+overlap = same-prior collapse vector regardless of whether the agent
+is "mutator", "adversary", or "peer" — the load-bearing distinction
+is **spawned vs in-conversation**, not the role label.
 
 **Empirical anchor (2026-04-29 abelian self-audit dogfood)**: peer-A
 (orchestrator Claude) self-attack on 5 mutation propose found 1
@@ -718,13 +729,12 @@ failure.
   benchmarks → `repeated_median (5 runs)`. Tolerance enables baseline
   validation in step C without rejecting legitimate measurement noise.
 - **Strategy**: ≥2 axes (chains C>1 and co-research depend on
-  diversity; single-axis means use `unilateral` mode and a different
-  tool, not abelian). **v2.17 exception**: Strategy=1 is permitted IFF
-  `state.sharpening.triage_classification = "single-axis"` AND program.md
-  is launched with `--mode=unilateral`. This handles the case where
-  rule #17 sharpening discovers the mission is genuinely single-axis
-  verification — the loop redirects within abelian (unilateral mode)
-  rather than rejecting outside it.
+  diversity; single-axis means use a different review tool, not
+  abelian). **v3.0 update**: with unilateral mode removed in v3.0,
+  the v2.17 single-axis exception no longer applies — Strategy ≥2
+  is the universal rule. Rule #17 Pass 0 triage classifying
+  `single-axis` now exits with reroute diagnostic instead of running
+  as abelian.
 - **Attack Classes**: ≥1 named library from {default, doc-class,
   research-class, audit-class, decision-class} OR ≥1 custom domain
   extension.
@@ -815,11 +825,11 @@ Output: `$RUN_DIR/round-0/program-adversary.txt`. Header (rule #11
 inherited verbatim):
 
 ```
-ABELIAN-ADV-v1
+ABELIAN-PEER-v1
 run_id: <state.run_id>
 round: 0
 peer: program-gate
-nonce: <state.round_0.adversary_nonce>
+nonce: <state.round_0.peer_nonce>
 started_at: <ISO 8601 with milliseconds>
 verdict: <single-line verdict>
 evidence_class: theoretical
@@ -1027,14 +1037,19 @@ gate runs unchanged after sharpening produces draft.
 
 ### Trigger
 
-- `abelian sharpen "<fuzzy mission>"` (string mode, explicit)
-- `abelian sharpen --mission-file <path>` (file mode, explicit)
+- `abelian --mission "<fuzzy text>"` (string, explicit flag)
+- `abelian --mission-file <path>` (file, explicit flag)
 - File auto-detect: `abelian <existing-file>` where the file LACKS a
   `## Goal` section → orchestrator prompts "this looks like a draft,
-  not a program.md. Run sharpening to compose it? (yes / no)".
+  not a program.md. Run goal-authoring stage to compose it? (yes / no)".
   Bare strings to `abelian` are NEVER auto-classified as fuzzy
-  missions (closes typo-as-mission risk, e.g., `abelian progrma.md`
-  with typo would otherwise become a sharpening run).
+  missions (closes typo-as-mission risk).
+
+**v3.0 unification**: prior `abelian sharpen "<mission>"` subcommand
+removed. Goal-authoring is a stage of the unified loop triggered via
+explicit `--mission` flag. Same propose+attack discipline applied to
+goal-authoring artifact (program.md draft) as is applied later to
+round-mutation artifacts.
 
 ### Pass 0 — Triage
 
@@ -1051,9 +1066,11 @@ Single LLM call (~$0.05). Classify the fuzzy mission:
   outcome. Output diagnostic: "Route to `ce-brainstorm`; mission
   has no ground source for sharpening." Exit non-zero.
 - **`single-axis`** — measurable noun present + 1 obvious mechanism.
-  Proceed to Pass 1+ but record `recommended_mode: unilateral` in
-  trace.json. Pass 3 will produce Strategy=1, allowed by rule #16 A
-  v2.17 exception.
+  **v3.0 change**: exits with reroute diagnostic ("Mission is
+  single-axis verification; abelian's diversity engine has no value
+  here. Use a separate review tool."). Previously (v2.17) proceeded
+  with `recommended_mode: unilateral` — but v3.0 dropped unilateral
+  mode, so single-axis missions cannot run as abelian.
 
 Output: `$RUN_DIR/sharpening/pass-0/triage.md` (classification +
 reasoning + rejected_classifications array).
@@ -1164,9 +1181,9 @@ real invariants from over-cautious Y.
 Converge predicate:
 1. `attack_survival` — no BLOCKER
 2. `mission_traceability` — mechanism traceable to metric
-3. `rule_16_composability` — `Strategy ≥2 surviving axes` (or 1 axis
-   if triage classified `single-axis`, per rule #16 A v2.17 exception)
-   AND Constraints set non-empty
+3. `rule_16_composability` — `Strategy ≥2 surviving axes` (v3.0:
+   single-axis triage exited at Pass 0; only fuzzy-but-grounded
+   missions reach Pass 3) AND Constraints set non-empty
 
 Output: `pass-3/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
 The converged.md contains BOTH Strategy axes AND Constraints set.
@@ -1346,3 +1363,125 @@ Designed via 2-round co-research with codex (peer-B, gpt-5.5 xhigh):
 - Round 2: 4 MAJOR attacks + 6 verdicts + ACCEPT-WITH-FIXES convergence
 
 Full razor history: [TODO.md](TODO.md) "v2.17".
+
+## 18. Asymmetric peer discipline (v3.0) — innovative-grounded propose, strictly-verification-oriented counter
+
+Every peer in abelian operates in two modes during a round / pass:
+
+- **PROPOSE mode** — generating a mutation, candidate route, outcome
+  distillation, metric forge, lever surfacing, alternative_routes
+  block, or any "what should we try?" output.
+- **COUNTER mode** — responding to another peer's attack on the peer's
+  own work. The rebuttal step where the attacked peer must defend or
+  concede.
+
+The disciplines are asymmetric. Conflating them collapses the loop's
+quality:
+
+### PROPOSE mode discipline: innovative AND grounded
+
+**Innovative** — propose must surface novel framings, mechanism
+enumeration, cross-domain analogues, or speculative routes. Safe-
+incremental restatements of prior round's path = peer is collapsing
+to RLHF prior. Specifically forbidden phrases: "extend X with...",
+"refine the existing...", "polish the current..." when the path is
+already the obvious next step. If the only proposal a peer can
+generate is incremental, the peer must mark `exploration_round=true`
+and surface ≥1 SPECULATIVE route (`est_metric_delta: "unknown"` per
+rule #14).
+
+**Grounded** — every proposal must cite ≥1 anchor: file path + line
+range, command + actual output, or quoted user/spec/doc text with
+source. No vibes ("seems faster"), no fabricated specifics ("50%
+faster" without measurement), no authority-by-citation without the
+citation actually existing (rule #16 program-adversary class
+c4-authority-by-citation generalizes to all peer proposals here).
+
+Commit-gate (rule #2 check 8) extends: when round has any
+`mission_thread.candidate_routes` entry whose `mechanism` field lacks
+a grounding citation OR uses safe-incremental phrasing without
+`exploration_round=true` justification → check 8 fails → revert.
+
+### COUNTER mode discipline: strictly verification-oriented
+
+When peer-A's mutation is attacked by peer-B, peer-A's response
+options are **strictly limited** to:
+
+1. **Convert the attack to a probe and run it** — regression test,
+   benchmark input, rubric criterion, shell command, grep pattern,
+   or any falsifiable check derived from the attack's "this is wrong
+   if X" form (rule #14 + v2.14 doc-task cross-attack criterion 4).
+   Run the probe. If probe shows the attack's claim is false (X does
+   NOT hold), the mutation survives that attack. If probe shows the
+   attack's claim is true (X DOES hold), the mutation reverts on its
+   branch.
+
+2. **Concede and revert** — accept the attack without a probe.
+   Mutation reverts. State.rounds[N].peer_<slot>.attacks_conceded
+   logs the attack-id.
+
+3. **Mark non-codifiable + escalate to human** — if the attack
+   genuinely cannot be converted to a probe (purely qualitative
+   judgment with no grep/run/count form even after attempt), mark
+   the round's attack-id with `non_codifiable: true` AND
+   `escalation_required: true`. The mutation reverts on its branch
+   for this round; human reviews the attack post-campaign. Counter
+   cannot survive without falsifiable verification — escalation is
+   the safe-fail path, not a counter-survival path.
+
+**Forbidden in COUNTER mode**:
+- "I disagree because..." without a probe
+- "The attack misunderstands..." without a grep-able rebuttal
+- "This was already addressed" without citing line/commit + showing
+  the addressing artifact (codex round-2 catch on rule #14 trace)
+- Any argumentation that does not produce a binary
+  attack-falsified-or-mutation-reverts outcome
+
+### Why asymmetric
+
+PROPOSE without innovation collapses to "extend last round's path";
+PROPOSE without grounding fabricates plausible-but-fictional
+direction. COUNTER without strict verification becomes argumentation
+— the peer talks the attack down, mutation lands, but the actual
+failure mode the attack identified is unaddressed.
+
+The asymmetry is what makes adversarial collaboration deliver
+quality: be expansive when generating, be strict when defending.
+Same peer, same round, two disciplines.
+
+### Empirical anchor
+
+Codex 56-round trading-internal PM dogfood (2026-05-02): rounds 30-56
+had peer-A counter-mode arguments ("the attack assumes X but
+actually...") that landed without probes; mutations passed gate
+without verification; mission metric stayed flat. v3.0 rule #18
+makes that pattern gate-fail. PROPOSE-mode innovation gap: same
+campaign, peer-A `mission_thread.candidate_routes` had ≥2 entries per
+round but >75% were safe-incremental restatements of prior round's
+mechanism (no novel framings, no speculative routes). Rule #14
+required ≥2 entries (rule #14); rule #18 raises the bar to "≥2 entries
+WITH innovation discipline".
+
+### Implementation in peer prompts
+
+The orchestrator's prompt template per peer call MUST embed both
+disciplines:
+
+```
+PROPOSE: generate ≥2 candidate_routes. Each must cite ≥1 file/command/output.
+        Avoid safe-incremental phrasing unless exploration_round=true with
+        ≥1 speculative route (est_metric_delta: "unknown") justified inline.
+
+COUNTER: when responding to attacks on your own mutation, you may:
+        (a) convert attack to probe, run, return PASS/FAIL — preferred
+        (b) concede + revert — acceptable
+        (c) mark non_codifiable + escalation_required — last-resort
+        Argumentation without probe is FORBIDDEN. Counter-mode
+        verdict line must contain "PROBE-PASS" or "PROBE-FAIL" or
+        "CONCEDED" or "NON-CODIFIABLE-ESCALATED".
+```
+
+This template is included in both Claude Code Agent prompts and
+codex CLI subprocess prompts. Rule #11 nonce-header friction defense
+applies; the `verdict` field encodes which COUNTER-mode action was
+taken.

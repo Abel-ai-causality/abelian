@@ -1,80 +1,84 @@
 ---
 name: abelian
-version: 2.17.0
+version: 3.0.0
 description: >
   **Adversarial collaboration framework** (Kahneman-style applied to LLM
   dispatch) for deep, innovative, long-horizon iteration with tractable
-  doc and testable metric. Two LLM peers each propose AND challenge each
-  other; mutual inspiration between rounds; mechanism-converge termination.
-  17 INVARIANTS rules provide long-horizon scaffolding (file-gate, drift,
-  nonce, anti-compaction, forbidden termination rationales, mission-thread
-  goal-anchor, evidence-class enum, program-contract gate, adversarial
-  goal sharpening) — shared substrate with unilateral review frameworks;
-  not abelian-specific. Two iteration modes + opt-in goal-sharpening
-  pre-flight:
+  doc and testable metric.
 
-  - **Co-research mode (default since v2.10, "auto-research-loop")** — two peer
-    agents both propose AND challenge each other goal-driven; mutual inspiration
-    prevents the hidden collapse of "attack-only adversary + propose-only
-    generator." Best for: discovery, novel design, "where do I start",
-    non-trivial work where any mutation has multiple defensible directions.
-    Cost 2× per round but ~1.5× fewer rounds for non-trivial work
-    (~33% net overhead). **Diversity via DIFFERENT CONTEXT FRAMING per peer
-    at SAME max-effort tier** (not via downgrading one peer). Cross-model pair
-    preferred for highest diversity; same-model pair with different
-    context-framing is acceptable and beats opus+haiku per empirical 2026-04-26.
+  **One loop, one discipline**: every configured peer (default 2)
+  proposes AND attacks every other peer's proposals. Mutual inspiration
+  between rounds. Mechanism-converge termination. 18 INVARIANTS rules
+  harden against fabrication, drift, compaction, mission drift,
+  cross-layer evidence confusion, fuzzy-program-contract, fuzzy-mission,
+  and propose/counter discipline asymmetry.
 
-  - **Unilateral mode (--mode=unilateral, "auto-verify-loop")** — generator +
-    adversary — mutate → evaluate → attack → keep/revert. Opt-in for known-
-    target verification, ship-prep, audit, regression hardening, single-axis
-    micro-optimization. Cost 1×. Cross-model adversary (Codex) opt-in for
-    high-stakes.
+  **Asymmetric peer discipline (rule #18)**: when a peer is in PROPOSE
+  mode (generating a mutation, candidate route, outcome distillation,
+  metric forge, lever surfacing, or any "what should we try?" output),
+  it must be **innovative AND grounded** — novel framings + ≥1
+  cited file / command / output (no vibes, no fabrication). When a peer
+  is in COUNTER mode (responding to another peer's attack on its own
+  work), it must be **strictly verification-oriented** — convert the
+  attack to a probe (regression test / benchmark / rubric criterion /
+  shell command), run it, return PASS/FAIL evidence. Argumentation
+  without falsification target is forbidden in counter mode; if the
+  attack cannot be converted to a probe, the mutation reverts.
 
-  Default = co-research per v2.10 first-principles audit (collaborative
-  framing > adversarial framing on Codex; "unilateral attack-only is itself
-  a collapse vector for non-trivial work" — SKILL.md's own prior wording).
-  Switch to unilateral with --mode=unilateral when the task is genuinely
-  single-axis verification.
+  **Two stages, ONE loop, auto-detected from input**:
+  - `abelian program.md` — sharp contract; skip goal-authoring stage
+  - `abelian --mission "<fuzzy text>"` — fuzzy mission; goal-authoring
+    stage runs first (rule #17), produces program.md draft, then loop
+    enters round-0 gate and round-mutation stage
 
-  **Skill activation rule (v2.12, INVARIANTS rule #13)**: any conversation-
-  level reference to this skill — campaign or meta-audit — that involves
-  ≥3 mutation proposals, protocol-level changes, or "verdict / done / keep
-  / revert / accept / pareto / trade-off" vocabulary applied to mutation
-  evaluation triggers a hard requirement: spawn dispatched adversary (Agent
-  + Skill('dissect') OR codex exec subprocess) BEFORE reaching verdict.
-  Self-attack in conversation context is unilateral self-judge (rule #8
-  degraded mode), not co-research. RLHF prior overlap means mutator and
-  self-attacker share the same prior over BOTH "what to mutate" and "how
-  to attack mutations" — empirical 17× catch-rate ratio (peer-B vs
-  self-attack, 2026-04-29 self-audit) confirms severity.
+  Same mechanism (propose + attack + converge) applied at different
+  abstraction layers. Goal-authoring is not a separate mode; it is the
+  loop operating on the goal as the artifact.
+
+  **Peer configuration** (NOT modes — these select which LLM plays each
+  peer slot, the loop discipline is identical):
+  - `--peers=claude+claude` (Claude Code default) — same family, different
+    context-framing per peer at SAME max-effort tier (not via downgrading)
+  - `--peers=claude+codex` — cross-family priors (highest diversity, high stakes)
+  - `--peers=codex+codex` (Codex CLI default) — same family, different
+    context-framing per peer
+
+  Cost 2× per round vs single-peer review tools but ~1.5× fewer rounds for
+  non-trivial work (~33% net overhead) — empirically validated on
+  v2.14/v2.15/v2.16/v2.17 design dogfood. Diversity comes from DIFFERENT
+  CONTEXT FRAMING per peer at SAME max-effort tier.
+
+  Tasks that genuinely fit single-peer review (typo fix, single-axis verify,
+  ship-prep against a known target) are out of abelian's scope — abelian
+  is for adversarial collaboration on innovative work, not single-axis
+  verification. Use a separate review tool for those.
+
+  **Skill activation rule (rule #13)**: any conversation-level reference
+  to this skill — campaign or meta-audit — that involves ≥3 mutation
+  proposals, protocol-level changes, or "verdict / done / keep / revert
+  / accept / pareto / trade-off" vocabulary applied to mutation evaluation
+  triggers a hard requirement: spawn a dispatched peer (Agent + Skill('dissect')
+  OR codex exec subprocess) BEFORE reaching verdict. Self-challenge in
+  conversation context is unilateral self-judge (rule #8 degraded mode),
+  not co-research. RLHF prior overlap means an agent attacking its own
+  propose shares priors over BOTH "what to mutate" and "how to attack" —
+  empirical 17× catch-rate gap (peer-B vs self-challenge, 2026-04-29
+  self-audit) confirms severity.
 
   **Target should include executable artifacts whenever possible —
   spec-only is the degraded mode for both modes.**
-
-  **Adversarial Goal Sharpening (v2.17, opt-in, INVARIANTS rule #17)** —
-  for fuzzy missions ("improve trading internal" / "make dashboard
-  better"), `abelian sharpen "<mission>"` runs a 5-pass protocol
-  (triage + outcome distillation + metric forge + lever surfacing +
-  Takeaway derivation) that compiles fuzzy mission to rule
-  #16-compliant program.md draft. Native abelian answer to OKR's
-  hierarchical decomposition: per-program.md-field adversarial sharpening
-  with co-research divergence. Reuses dissect attack classes c1-c4+d4,
-  rule #11 nonce header, peer-A/peer-B framing. After draft → rule #16
-  round-0 gate validates as if user wrote it. Triage exits early on
-  `sharp` (write directly) or `fuzzy-ungrounded` (route to
-  ce-brainstorm); `single-axis` triage allowed via rule #16 A v2.17
-  exception (Strategy=1 + `--mode=unilateral`).
 
   Per-version mechanism details + razor history live in [TODO.md](TODO.md)
   and [README.md](README.md) changelog. SKILL.md description stays
   timeless; changelog rotates.
 
   Use when user says "abelian", "autoloop", "auto-optimize", "run experiments",
-  "optimize this", or "Karpathy loop". The skill name is historical (covers
-  unilateral verification too despite "research" framing); future v3.0 may flip
-  default to co-research once empirical track record validates cost model.
+  "optimize this", "Karpathy loop", or any adversarial-collaboration mutation
+  campaign. v3.0 collapses prior mode lexicon (unilateral / co-research / dissect /
+  codex / off) into ONE loop with peer configuration; legacy flags
+  deprecated, see Migration section.
 user-invocable: true
-argument-hint: 'abelian program.md [--chains=C] [--depth=L] [--candidates=M] [--adversary=<dissect|codex|both|off>] [--portfolio=K] [--mode=unilateral] [--code-review=on] | abelian sharpen "<fuzzy mission>" [--mission-file <path>] [--target-hint <paths>] [--interactive-sharpening]'
+argument-hint: 'abelian program.md [--peers=claude+claude|claude+codex|codex+codex] [--chains=C] [--depth=L] [--candidates=M] [--portfolio=K] [--code-review=on] | abelian --mission "<fuzzy text>" [--target-hint <paths>] [--interactive-sharpening]'
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
@@ -230,7 +234,7 @@ with a fresh `RUN_ID`. Cheaper to verify the gitignore upfront.
 Add the patterns and commit BEFORE the loop's first round — not as
 part of round 1 — to keep "fixture setup" out of the campaign history.
 
-## Adversarial Goal Sharpening (v2.17, opt-in) — INVARIANTS rule #17
+## Goal-Authoring Stage (v3.0, was "Adversarial Goal Sharpening" v2.17) — INVARIANTS rule #17
 
 Rule #16 enforces program.md sharpness but rejects fuzzy program.md
 (measurable-noun whitelist, baseline tolerance, Takeaway derivation).
@@ -245,17 +249,23 @@ abelian's own machinery onto goal-authoring itself.
 ### Trigger
 
 ```bash
-abelian sharpen "<fuzzy mission>"                # string mode
-abelian sharpen --mission-file <path>            # file mode
-abelian sharpen "..." --target-hint <paths>      # bound reconnaissance
-abelian sharpen "..." --interactive-sharpening   # 5 mini-confirms (one per pass)
+abelian --mission "<fuzzy text>"                 # fuzzy mission, string
+abelian --mission-file <path>                    # fuzzy mission, file
+abelian --mission "..." --target-hint <paths>    # bound reconnaissance
+abelian --mission "..." --interactive-sharpening # 5 mini-confirms (one per stage pass)
 ```
 
 File auto-detect: `abelian <existing-file>` where the file LACKS a
 `## Goal` section → orchestrator prompts "this looks like a draft, not
-a program.md. Run sharpening to compose it? (yes / no)". Bare strings
-to `abelian` are NEVER auto-classified as fuzzy missions (closes
-typo-as-mission risk; explicit `sharpen` subcommand required).
+a program.md. Run goal-authoring stage to compose it? (yes / no)".
+Bare strings to `abelian` are NEVER auto-classified as fuzzy missions
+(closes typo-as-mission risk; explicit `--mission` flag required).
+
+**v3.0 unification**: previous `abelian sharpen` subcommand removed.
+Goal-authoring is a stage of the unified loop, not a separate mode/
+subcommand. Same propose+attack mechanism applied to goal-authoring
+artifact (program.md draft) as is applied to round-mutation artifacts
+later.
 
 ### Pass 0 — Triage
 
@@ -587,12 +597,16 @@ Per-round cost shape:
 
 ```
 /abelian program.md \
-  --chains=C       # default 1
-  --depth=L        # default 1
-  --candidates=M   # default 1
-  --portfolio=K    # default 1 (single champion)
-  --mode=co-research  # optional, switches to peer-attack mode
-  --adversary=codex   # optional, cross-family adversary (high stakes)
+  --peers=claude+claude    # default (Claude Code) or codex+codex (Codex CLI)
+                           # cross-family: claude+codex (high stakes)
+  --chains=C               # default 1
+  --depth=L                # default 1
+  --candidates=M           # default 1
+  --portfolio=K            # default 1 (single champion)
+  --code-review=on         # optional, rule #12 supplemental code-quality gate
+
+# Fuzzy mission entrypoint (v3.0):
+/abelian --mission "<fuzzy text>" [--target-hint <paths>] [--interactive-sharpening]
 ```
 
 **No `--rounds` / `--budget` flag**. Abelian runs **till converge** per
@@ -623,46 +637,51 @@ For each round:
 7. **Record** — append to History: kept/reverted/error, cell, adversary-result, metric delta.
 8. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
 
-## Adversary
+## Peer Challenge (v3.0; was "Adversary" in v2.x)
 
-**Driver-neutral protocol**: a fresh adversary subagent receives a prompt that includes verbatim `program.md` Goal/Target/Constraints/Attack-Classes + a fresh nonce + ISO timestamp, executes in isolated context with its own tool access (Read/Bash/Write or equivalent), writes the attack list to `$RUN_DIR/round-N/adversary.txt` with a mandatory `ABELIAN-ADV-v1` header (rule #11), and returns the verdict line. Two reference dispatches:
+**v3.0 reframe**: in v3.0, every peer in the configured pair (default 2)
+operates as both a proposer AND a challenger. There is no separate
+"adversary" role — each peer challenges the other. Section retains
+some v2.x "adversary" wording where it refers to the structural
+discipline (file-gate, nonce, attack-class checklist) rather than a
+distinct role.
+
+**Driver-neutral protocol**: a fresh peer subagent receives a prompt that includes verbatim `program.md` Goal/Target/Constraints/Attack-Classes + a fresh nonce + ISO timestamp, executes in isolated context with its own tool access (Read/Bash/Write or equivalent), writes the attack list to `$RUN_DIR/round-N/peer-<slot>.txt` with a mandatory `ABELIAN-PEER-v1` header (rule #11), and returns the verdict line. Two reference dispatches:
 
 - **Claude Code primary**: `Agent(general-purpose)` running `Skill('dissect')` — see [`drivers/claude-code/README.md`](drivers/claude-code/README.md). This is the default for `/abelian program.md` invocation in a Claude Code session. Adversary subagent is a Claude with same RLHF family as the mutator — structural role split, weak prior split.
 - **Codex CLI primary**: `codex exec - -s workspace-write` subprocess + the [`prompts/dissect.md`](prompts/dissect.md) template — see [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md). Self×self default (codex × codex with different prompt context per role at full max-effort). No wrapper script — codex CLI is itself an LLM agent harness consuming SKILL.md directly, the same way Claude Code does.
 
 Both drivers honor the same protocol and INVARIANTS. The descriptions below use Claude Code idiom (Agent / Skill / MCP) because abelian's original implementation was Claude Code. Codex CLI users substitute `codex exec` for `Agent(...)` and `prompts/dissect.md` content for `Skill('dissect')`. Mechanism, header, gate, and INVARIANTS are byte-for-byte identical.
 
-Override via `--adversary=<value>`:
+Peer pair via `--peers=<config>`:
 
-| Value | Adversary | Prior separation | Cost | When to use |
-|-------|-----------|------------------|------|-------------|
-| `dissect` (default) | Claude subagent + `Skill('dissect')` | Weak (same RLHF family) | Low | Most cases, zero-config, portable |
-| `codex` | codex CLI subprocess: `codex exec - -s read-only -c 'model_reasoning_effort="high"' < prompt`. Requires codex CLI installed (`npm i -g @openai/codex`) + `codex login` (auth lives in `~/.codex/auth.json`). The orchestrator may alternatively use a codex MCP wrapper if one is configured — the protocol does not depend on the dispatch mechanism. | Strong (cross model family) | High | High stakes, self-judge eval, key decisions |
-| `both` | Both adversaries; **union of attacks** (no consensus required) | Strongest | Highest | 24/7 night-shift, PR-level / production decisions |
-| `off` | None | — | None | Shell-eval only; **refused** when Eval is `self-judge` |
+| Value | Pair | Prior separation | Cost | When to use |
+|-------|------|------------------|------|-------------|
+| `claude+claude` (Claude Code default) | Two Claude subagents with `Skill('dissect')`, different context-framing per peer | Weak (same RLHF family, but different framing) | 2× | Most cases, zero-config, portable |
+| `codex+codex` (Codex CLI default) | Two codex exec subprocesses with `prompts/dissect.md`, different framing per peer | Weak (same family, different framing) | 2× | Codex-CLI-native runs |
+| `claude+codex` | Cross-family pair (one peer Claude, one peer codex via subprocess; codex CLI required + auth'd) | Strong (cross model family) | 2× (higher per-call) | High stakes, self-judge eval, key decisions |
+
+For 3-peer / N-peer topologies (e.g., adding codex as third reviewer): use `--code-review=on` (rule #12 supplemental gate) or wait for v4.0 N-peer architecture. v3.0 default is 2-peer.
+
+`--adversary=off` (v2.x) is REFUSED in v3.0 — abelian without peer challenge is not abelian.
 
 **File-gated output (v2.8).** The adversary subagent MUST write its full attack list (or empty list with explicit `n/a-this-target` per attack class) to `$RUN_DIR/round-N/adversary.txt` BEFORE returning. Co-research writes `peer-A.txt` and `peer-B.txt` separately. Conversation-only return = invalid, fails commit-gate. The agent prompt MUST quote `program.md` Goal/Target/Constraints/Attack-Classes verbatim — paraphrasing forbidden. INVARIANTS rules #1, #7.
 
-**Header-block protocol (v2.8 anti-fabrication).** Before each adversary call, the mutator generates a fresh `nonce` (16 hex via `secrets.token_hex(8)`) and `started_at` (ISO ms) and writes both into `state.rounds[N].{adversary_nonce, adversary_started_at}`. The prompt instructs the subagent to write a mandatory header block (`ABELIAN-ADV-v1` + run_id + round + peer + nonce + started_at + verdict, then `---`, then attacks) as the first lines of the output file. Commit-gate verifies nonce match + mtime in valid range + verdict in body. INVARIANTS rule #11. This is friction-level defense (not cryptographic) targeting Threat-1: post-compaction "forgot to call adversary" silent fabrication. A mutator must now cat state.json to find the nonce, which triggers cat INVARIANTS, which surfaces "must actually call adversary."
+**Header-block protocol (v2.8 anti-fabrication, v3.0 PEER-v1 rename).** Before each peer challenge call, the orchestrator generates a fresh `nonce` (16 hex via `secrets.token_hex(8)`) and `started_at` (ISO ms) and writes both into `state.rounds[N].{peer_<slot>_nonce, peer_<slot>_started_at}`. The prompt instructs the subagent to write a mandatory header block (`ABELIAN-PEER-v1` + run_id + round + peer + nonce + started_at + verdict, then `---`, then attacks) as the first lines of the output file. Commit-gate verifies nonce match + mtime in valid range + verdict in body. INVARIANTS rule #11. This is friction-level defense (not cryptographic) targeting Threat-1: post-compaction "forgot to call peer" silent fabrication. An orchestrator must now cat state.json to find the nonce, which triggers cat INVARIANTS, which surfaces "must actually call peer."
 
-**Adversary's job (unilateral mode):** find what breaks, NOT propose alternatives. Cannot endorse, only attack.
+**Peer's challenge job (v3.0)**: under one-loop discipline, every configured peer both proposes mutations AND attacks the other peer's mutations (rule #18 asymmetric discipline: innovative+grounded when proposing, strictly verification-oriented when countering). When a peer is in the CHALLENGE phase of a round (attacking the other peer's mutation), it may also write an informational `alternative_routes:` section at end of attacks (after `---`-delimited attack content). Alternative routes are **non-binding** (commit-gate ignores their content; rule #11 header-block validation does not extend to this section), but **readable** by the next round's peers when generating `mission_thread.candidate_routes` (rule #14 reject-pool mining + Frame-break Protocol step 5). Schema per rule #11 (each entry has `id`, `mechanism`, `est_metric_delta`, `rationale`).
 
-**Adversary's job (co-research mode, v2.15):** find what breaks AND optionally write an informational `alternative_routes:` section at end of attacks (after `---`-delimited attack content). Alternative routes are **non-binding** (commit-gate ignores their content; rule #11 header-block validation does not extend to this section), but **readable** by the next round's mutator/peer when generating `mission_thread.candidate_routes` (rule #14 reject-pool mining + Frame-break Protocol step 5). Schema per rule #11 (each entry has `id`, `mechanism`, `est_metric_delta`, `rationale`).
-
-The unilateral-mode prohibition stands because (a) unilateral has no peer to consume alternative routes, and (b) without a peer's review, adversary-as-proposer reintroduces the propose-attack collapse v2.6 was designed to prevent. Co-research mode has both safeguards: the OTHER peer's adversary call independently attacks any mutation derived from these alternative routes.
-
-**Why this is the right partial-relaxation**: the line-273 ban (v2.0+) prevented adversary-collapse to "all-KILL" by structurally separating roles. v2.15 keeps the role separation in the binding gate (alternative_routes does NOT count as a verdict; the verdict line is still attack-only) while allowing the adversary to contribute creative direction signal that the next round MAY mine. This is the difference between "stuck adversary" and "co-researcher offering a different angle." Codex 56-round PM dogfood (2026-05-02) showed the adversary-as-only-attacker telos exhausts itself within frame; allowing informational propose lets the loop break frame at the source where stuck-ness was first detected.
+**v3.0 unification of v2.x role distinctions**: in v2.0-v2.14 the "adversary" was a separate role (attack-only, no propose). v2.15 partially relaxed for co-research mode (allowing informational alternative_routes). v3.0 collapses the role distinction entirely — every peer challenges every other peer; rule #18 governs the propose/counter discipline asymmetry. The v2.0 line-273 ban ("adversary cannot endorse, only attack") is replaced by rule #18: in COUNTER mode, peer must be strictly verification-oriented (probe-or-revert-or-escalate); argumentation forbidden. This is the structural mechanism behind "adversarial collaboration" — every party propose+attack, with asymmetric discipline per phase.
 
 **Code Review supplemental layer (`--code-review=on`)**: orthogonal to the adversary call above, abelian can run codex CLI's purpose-built `codex review --uncommitted` as an additional gate before commit (INVARIANTS rule #12). This is a code-quality layer using codex's built-in P1/P2/P3 severity schema — different from rule #1's domain-specific attack-class adversary. Output to `round-N/codex-review.txt` (no header block — rule #11 does not apply to this file). Commit-gate adds the conditional check (rule #2 check 11) when enabled: no `[P1]`/`[P2]` markers in codex-review.txt. Use for ship-prep, PR-level decisions, security-sensitive mutations. Default off because cost roughly doubles per round.
 
 **Graceful degradation (loud, never silent):**
-- `--adversary=codex` + codex CLI unavailable (binary missing OR `~/.codex/auth.json` absent OR codex MCP wrapper not configured) → degrade to `dissect`, **write notice in 3 places**: console (stderr), `abelian/escalations.md`, and History row for the affected rounds. Continue loop.
-- `--adversary=both` + codex CLI unavailable → degrade to `dissect`-only with same 3-place notice. Continue loop.
+- `--peers=claude+codex` + codex CLI unavailable (binary missing OR `~/.codex/auth.json` absent OR codex MCP wrapper not configured) → degrade to `claude+claude` (same-family with different framing), **write notice in 3 places**: console (stderr), `abelian/escalations.md`, and History row for the affected rounds. Continue loop.
 - Degradation decision is made **once at loop start** — don't re-check codex every round (noise + unpredictable runs).
-- The notice must include the why: "codex CLI not reachable (run `codex login` and verify `codex exec --version`); cross-model adversary disabled; runs are weaker on prior diversity for this session."
-- `--adversary=off` + Eval=`self-judge` → **hard refuse to start** (no degradation). This combination has zero LLM check on a vibes-based eval — structurally unsafe.
+- The notice must include the why: "codex CLI not reachable (run `codex login` and verify `codex exec --version`); cross-family pair disabled; runs are weaker on prior diversity for this session."
+- `--code-review=on` + codex CLI unavailable → skip rule #12 only (don't fail loop), 3-place notice (per rule #12 graceful degradation). Continue loop.
 
-**Honest limit:** Default `dissect` breaks structural self-collapse but does NOT break model-family collapse. Two Claudes with role split still share RLHF priors. For high-stakes decisions, `--adversary=codex` is the cross-model upgrade — don't default-trust the default.
+**Honest limit:** Default `claude+claude` (or `codex+codex` on codex CLI) with different framing breaks structural self-collapse but does NOT break model-family collapse. Two Claudes with different framing still share RLHF priors. For high-stakes decisions, `--peers=claude+codex` is the cross-family upgrade.
 
 **v2.15 termination shift**: termination is no longer "adversary exhausted across N rounds." Adversary-exhausted is now an **informational signal** that triggers Frame-break Protocol (5-step mandatory creative-escape sequence; see "Frame-break Protocol" section). Only after K consecutive frame-break rounds yield no positive-EV `candidate_route` does the loop terminate via `no-proposal-after-K-frame-breaks`. Termination conditions per rule #6: `goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | user-interrupt`.
 
@@ -1234,7 +1253,7 @@ Self-judge shares the mutator's biases (the v1 caveat). Hierarchy of evals, best
 
 When self-judge is unavoidable:
 - Rubric frozen in `program.md` Metric BEFORE loop starts (no rubric drift mid-run)
-- `--adversary` MUST be on — loop refuses to start with `--adversary=off` + self-judge
+- Peer challenge MUST be on — loop refuses to start without configured peers (v2.x `--adversary=off` is refused in v3.0; v3.0 has no off-switch for peer challenge)
 - Self-judge runs in a separate `Agent` call from the mutator, no shared context
 - **Schema-grounding required (v2.2)** — if the mutation references external schema (file paths, column names, API contracts, stored data formats, function signatures), the self-judge MUST verify each reference against the actual source (`Read` the file, run a SQL probe, hit the API) BEFORE scoring. A self-judge that scored ≥ rubric_max without a grounding step is structurally untrustworthy and must be re-scored as 0 on the affected dimensions. Pre-emption ("I expect adversary will probe X") catches things you already know to look for; grounding catches the unknown unknowns. Added after abelian's own first real run (Polymarket Round 1, 2026-04-22) where 2 BLOCKER typos were 4/4 self-judged then immediately caught by Codex SQL grounding.
 
@@ -1417,6 +1436,73 @@ Adversary-exhaustion is **necessary but not sufficient** for termination. The lo
 **How to apply at program.md level:** mark Target executable artifacts with shell-runnable Eval; set `termination_requires_execution_gate: true` (default). Doc-only mode set `termination_requires_execution_gate: false` explicitly + provide a downstream-confirmation step.
 
 **Key inversion:** when execution is in the loop, the abelian structure becomes MORE valuable, not less — adversary now has two surfaces (code logic + actual output), mutation is verifiable via git, portfolio cells produce real numbers. Spec-only mode is the corner case; executable mode is the bedrock.
+
+## Migration: v2.x → v3.0
+
+v3.0 collapses the mode lexicon. Legacy flags warn + map; legacy
+header reads accepted; behavior unified.
+
+### Flag deprecations
+
+| v2.x flag | v3.0 behavior |
+|---|---|
+| `--mode=co-research` | DEPRECATED no-op (warn). Co-research IS the loop in v3.0; no flag needed. |
+| `--mode=unilateral` | DEPRECATED warn + EXIT non-zero. v3.0 has no unilateral mode. Reroute to a different review tool for single-axis verification (abelian's "When abelian does NOT fit" positioning preserved). |
+| `--adversary=dissect` | DEPRECATED warn + map → `--peers=claude+claude` (Claude Code default) or `--peers=codex+codex` (codex CLI default) |
+| `--adversary=codex` | DEPRECATED warn + map → `--peers=claude+codex` |
+| `--adversary=both` | DEPRECATED warn + map → `--peers=claude+codex` AND `--code-review=on` (rule #12 supplemental gate). True 3-peer N>2 architecture is v4 territory. |
+| `--adversary=off` | REFUSED. abelian without peer challenge is not abelian. |
+| `abelian sharpen "<mission>"` (subcommand) | DEPRECATED. Replace with `abelian --mission "<text>"` flag. |
+
+Loop emits clear warning to stderr + writes to `escalations.md` for
+every deprecated flag observed. Mapping happens once at startup.
+
+### Header deprecation
+
+| Header magic | v3.0 behavior |
+|---|---|
+| `ABELIAN-PEER-v1` | Preferred. Emitted by all v3.0 peer challenges. |
+| `ABELIAN-ADV-v1` | Legacy. Commit-gate accepts during deprecation window for archived v2.x runs being resumed. New peer calls MUST emit PEER-v1. |
+
+After v3.x.y minor versions (target: v3.2), legacy `ABELIAN-ADV-v1`
+acceptance removed; runs with that header become inaccessible for
+resume (must be archived).
+
+### File layout deprecation
+
+| Path | v3.0 behavior |
+|---|---|
+| `$RUN_DIR/round-N/peer-A.txt` + `peer-B.txt` | Preferred. All v3.0 runs produce these. |
+| `$RUN_DIR/round-N/adversary.txt` | Legacy from v2.x unilateral mode. Read-only acceptance for resume of archived runs; not produced. |
+
+### What stayed the same
+
+- All commit-gate checks 1-11 (now 1-11+12 with rule #18 propose-grounding extension to check 8)
+- All program.md schema (Goal/Target/Eval/Eval ground/Metric/Constraints/Strategy/Cells/Attack Classes/Takeaway)
+- All state.json structure (rounds[], round_0, sharpening, frame_break_count_consecutive — keys unchanged)
+- All terminology of `program.md`, `Eval`, `Metric.tolerance`, `Takeaway.Validated_by`
+- Frame-break Protocol 5-step sequence
+- Rule #16 round-0 hard checklist clauses (Goal measurable noun, Strategy ≥2 axes [unless single-axis triage + --mode=unilateral... wait, we deprecated --mode]) — see v3.0 amendment below
+
+### Rule #16 A v3.0 amendment to v2.17 single-axis exception
+
+The v2.17 rule #16 A exception said `Strategy=1 IFF single-axis triage
+AND --mode=unilateral`. With v3.0 dropping unilateral mode, the
+exception updates to:
+
+```
+Strategy ≥2 axes UNLESS state.sharpening.triage_classification = "single-axis"
+AND program.md draft is launched with --peers=<config> known to handle
+single-axis (currently: rejected — v3.0 routes single-axis to a
+different review tool, since abelian's diversity engine has no value
+on single-axis tasks).
+```
+
+In practice, v3.0 sharpening Pass 0 triage classifying `single-axis`
+exits with diagnostic "Mission is single-axis verification; abelian's
+diversity engine has no value here. Use a separate review tool."
+This is stricter than v2.17 (which produced Strategy=1 + recommended
+unilateral); v3.0 honest exit instead of degraded run.
 
 ## Safety Rules
 

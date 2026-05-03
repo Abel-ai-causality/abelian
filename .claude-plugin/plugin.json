@@ -1,7 +1,7 @@
 {
   "name": "abelian",
-  "version": "2.17.0",
-  "description": "Adversarial collaboration framework (Kahneman-style applied to LLM dispatch) for deep, innovative, long-horizon iteration with tractable doc and testable metric. Two LLM peers each propose AND challenge each other; mutual inspiration between rounds; mechanism-converge termination. 17 INVARIANTS rules harden against fabrication, drift, compaction, mission drift, cross-layer evidence confusion, fuzzy-program-contract, and now (v2.17) fuzzy-mission upstream. v2.17: opt-in `abelian sharpen` mode runs adversarial goal sharpening (triage + outcome distillation + metric forge + lever surfacing + Takeaway derivation, 5 passes with co-research divergence + dissect attack classes) to compile fuzzy mission to rule #16-compliant program.md draft. Native answer to OKR's hierarchical decomposition.",
+  "version": "3.0.0",
+  "description": "Adversarial collaboration framework (Kahneman-style applied to LLM dispatch) for deep, innovative, long-horizon iteration with tractable doc and testable metric. v3.0 unification: ONE skill, ONE loop, ONE discipline — every configured peer (default 2) proposes AND attacks every other peer's proposals; mutual inspiration; mechanism-converge termination. 18 INVARIANTS rules harden against fabrication, drift, compaction, mission drift, cross-layer evidence confusion, fuzzy-program-contract, fuzzy-mission, and propose/counter discipline asymmetry. Rule #18 (NEW): peer must be innovative + grounded when proposing, strictly verification-oriented when countering attacks. Goal-authoring is a stage of the unified loop (auto-detected from --mission flag), not a separate mode. Prior mode lexicon (--mode=unilateral / co-research / --adversary=X) deprecated; --peers=<config> selects peer-tool pair.",
   "author": {
     "name": "Stephen",
     "url": "https://github.com/cauchyturing"
@@ -26,6 +26,9 @@
     "program-contract",
     "round-zero-gate",
     "goal-sharpening",
-    "fuzzy-to-sharp"
+    "fuzzy-to-sharp",
+    "asymmetric-peer-discipline",
+    "innovative-grounded-propose",
+    "verification-oriented-counter"
   ]
 }
