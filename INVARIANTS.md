@@ -314,17 +314,16 @@ unsure, suspend cron — cheap insurance.
 
 ## 11. Peer challenge header block (mandatory format)
 
-Every `peer-A.txt` / `peer-B.txt` MUST begin with this header block,
-written by the challenging peer itself, before any attack content:
+Every `peer-A.txt` / `peer-B.txt` (and round-0 `program-peer-challenge.txt` / sharpening pass artifacts) starts with this header, written by the peer itself before attack content:
 
 ```
 ABELIAN-PEER-v1
 run_id: <state.run_id>
 round: <N>
 peer: peer-A | peer-B | program-gate | sharpen-pass-N
-nonce: <state.rounds[N].peer_nonce>
+nonce: <state.rounds[N].peer_<slot>_nonce>
 started_at: <ISO 8601 with milliseconds>
-verdict: <single-line verdict, identical to state.rounds[N].verdict_line>
+verdict: <single-line verdict, identical to state.rounds[N].peer_<slot>_verdict_line>
 evidence_class: theoretical | paper | replay | settled | dry_run | live
 ---
 <attack content begins here>
@@ -336,68 +335,19 @@ evidence_class: theoretical | paper | replay | settled | dry_run | live
     rationale: <why peer would consider this>
 ```
 
-**v3.0 header rename**: previously `ABELIAN-ADV-v1` (v2.0-v2.17).
-Commit-gate accepts BOTH headers during deprecation window — `ABELIAN-PEER-v1`
-preferred (emit only this). Legacy archived runs with `ABELIAN-ADV-v1`
-remain valid for reading. Migration removes legacy support after 2
-minor versions.
+**evidence_class** (rule #15, REQUIRED): pick strongest class actually exercised. `theoretical` (analysis only) → `paper` (dry compute) → `replay` (historical data) → `settled` (real-world outcome observed) → `dry_run` (full pipeline, no commit) → `live` (production observation). Cross-class inflation = silent fabrication; rule #11 nonce-friction defense applies.
 
-`evidence_class` is REQUIRED (v2.15, rule #15). Whitelist:
-- `theoretical` — pure analysis of code/spec without execution
-- `paper` — paper trade / dry computation, no real-world commit
-- `replay` — historical data replay through pipeline
-- `settled` — observed against settled real-world outcome
-- `dry_run` — system-level dry-run with full pipeline but no commit
-- `live` — observed against live production system
+**alternative_routes** (optional): peer may write informational routes after attacks. Non-binding; commit-gate ignores content; readable by next round's mutator for `mission_thread.candidate_routes` (rule #14 reject-pool mining).
 
-Choose the strongest (rightmost on the ladder) class actually exercised.
-`live` claims must be reproducible from `state.rounds[N]` artifacts.
-Cross-class confusion ("we ran a paper test, the live behavior must be
-the same") is the v2.14 cron-vs-WS bug class — rule #15 makes the layer
-explicit per-round.
-
-`alternative_routes` is OPTIONAL and ONLY in co-research mode (v2.15).
-Adversary in unilateral mode remains attack-only (line 273 in SKILL.md
-preserved for unilateral). Co-research adversary may write informational
-alternative routes the next round's mutator MAY mine when generating
-`mission_thread.candidate_routes` (rule #14). Commit-gate (rule #2 check
-8) does NOT validate `alternative_routes` content; this section is
-non-binding informational signal, not a commitment.
+**v3.0 header rename**: previously `ABELIAN-ADV-v1` (v2.0-v2.17). Commit-gate accepts BOTH during deprecation window; new peer calls emit only `ABELIAN-PEER-v1`. Legacy support removed after 2 minor versions.
 
 **Orchestrator protocol** (per peer challenge call):
 
-1. Before calling `Agent(peer)`, generate:
-   - `nonce = python3 -c "import secrets; print(secrets.token_hex(8))"`
-     (16 hex chars, fresh per peer per round)
-   - `started_at = $(date +%Y-%m-%dT%H:%M:%S.%3N%z)` (ISO ms)
-   Write both to `state.rounds[N].{peer_<slot>_nonce, peer_<slot>_started_at}`.
+1. Generate fresh `nonce` (`secrets.token_hex(8)`, 16 hex) + `started_at` (ISO ms). Write to `state.rounds[N].peer_<slot>_{nonce, started_at}`.
+2. Prompt MUST include those values verbatim with instruction: write `ABELIAN-PEER-v1` header (these EXACT values) as first lines of `$RUN_DIR/round-<N>/peer-<slot>.txt`, then `---`, then attacks. Don't omit. Don't change nonce.
+3. After subagent returns, record verdict line in `state.rounds[N].peer_<slot>_verdict_line`. Commit-gate (rule #2) verifies.
 
-2. The peer prompt MUST include `run_id`, `round`, `peer`, `nonce`,
-   `started_at` verbatim and instruct the subagent:
-   > "Write the ABELIAN-PEER-v1 header block (these EXACT field
-   > values) as the first lines of `$RUN_DIR/round-<N>/peer-<slot>.txt`,
-   > then `---`, then the attack list. Do not omit the header. Do
-   > not change the nonce or started_at."
-
-3. After subagent returns, extract the verdict line from the body
-   (or accept it via subagent return value), record in
-   `state.rounds[N].verdict_line` (or `peer_<slot>_verdict_line` for
-   co-research). Commit-gate (rule #2) verifies the header before commit.
-
-**Honest scope**: friction-level defense, not cryptographic. An
-orchestrator deliberately bypassing the peer call could fabricate
-the entire header. The header's real value is anti-Threat-1
-(compaction oversight): an R5+ compacted orchestrator that "forgot"
-it skipped a peer challenge cannot silently hand-write `peer-X.txt`
-— it must first cat state.json to find the round's nonce, which
-triggers the rule #3 reading reflex (cat INVARIANTS) and surfaces
-rule #1 ("must actually call peer"). The friction converts a silent
-skip into a deliberate sabotage, and deliberate sabotage is loud +
-traceable in post-campaign review of round artifacts.
-
-For Threat-2 (deliberate fabrication) and Threat-3 (lazy peer output),
-see attack-class checklist (program.md) and post-campaign escalation
-review respectively.
+**Honest scope**: friction-level defense, not cryptographic. Real value is anti-Threat-1 (compaction oversight): a compacted orchestrator that "forgot" to call peer cannot silently hand-write the file — it must first cat state.json to find the nonce, which triggers rule #3's INVARIANTS re-read reflex, surfacing rule #1 ("actually call peer"). Friction converts silent skip → deliberate sabotage (which is loud + traceable in artifacts).
 
 ## 12. Code Review supplemental gate (opt-in, v2.11+)
 
@@ -512,97 +462,35 @@ the user to run co-research peer manually.
   context
 
 
-## 14. Mission Thread per round (v2.15) — anchor every round to goal
+## 14. Mission Thread per round — anchor every round to goal
 
-Every round MUST populate `state.rounds[N].mission_thread` with all
-seven fields below BEFORE the round's commit-gate runs. Missing or
-incomplete mission_thread = commit-gate check 8 fails = revert.
+Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate. Missing/incomplete = commit-gate check 8 fails = revert.
 
 ```json
 "mission_thread": {
-  "goal_paraphrase": "fresh paraphrase of program.md Goal, this round",
-  "metric_delta": 0.42,
+  "goal_paraphrase": str,           // fresh paraphrase, MUST differ from prior round
+  "metric_delta": float | null,     // null requires exploration_round=true
   "blocker_status": "removed | partially | blocked_on:<dep> | n/a",
-  "mission_relevance": "one sentence: how this round serves the mission",
-  "candidate_routes": [
-    {
-      "id": "route-a",
-      "mechanism": "what this route DOES, one line",
-      "est_metric_delta": 0.5,
-      "est_cost": "cheap | medium | expensive",
-      "blocker_chain": "if removing a blocker, which one"
-    },
-    { "id": "route-b", ... }
+  "mission_relevance": str,         // one sentence; cites Takeaway.Validated_by if rule #16 active
+  "candidate_routes": [             // ≥2 entries; single-route = gate-fail
+    { "id": str, "mechanism": str, "est_metric_delta": float | "unknown",
+      "est_cost": "cheap | medium | expensive", "blocker_chain": str | null }
   ],
-  "selected_route_id": "route-a",
-  "selection_reason": "must mention at least one unpicked route's tradeoff",
-  "exploration_round": false
+  "selected_route_id": str,         // matches a candidate_routes entry
+  "selection_reason": str,          // MUST cite ≥1 unpicked route's trade-off by id
+  "exploration_round": bool         // true allows null metric_delta + "unknown" est_metric_delta
 }
 ```
 
-**Field rules**:
+**Key gate constraints**:
 
-- `goal_paraphrase` — paraphrase of program.md Goal, fresh this round.
-  String-equality check against `state.rounds[N-1].mission_thread.goal_paraphrase`
-  MUST fail (i.e., this round's paraphrase MUST differ from prior round's).
-  Identical paraphrase = mutator did not re-read program.md = commit-gate
-  fails. Forces per-round Goal re-read; closes the v2.14 root cause where
-  program.md was read once at round 0 then INVARIANTS re-read per round
-  but goal-anchor did not propagate.
+- `goal_paraphrase` MUST differ from `state.rounds[N-1].mission_thread.goal_paraphrase` (string-equality check). Identical = mutator skipped re-reading program.md → gate-fail. Forces per-round Goal re-read.
+- `mission_relevance` forbidden phrases: "exploring / learning more / investigating / trying" without `exploration_round=true`. **Rule #16 trace** (when Takeaway present): MUST contain ≥1 verbatim/paraphrased phrase from `Takeaway.Validated_by`, paraphrase requires verbatim original cited inline. Untraceable → gate-fail.
+- `candidate_routes` ≥2 entries; unselected routes mineable by Frame-break Protocol step 1 (reject-pool mining). `est_metric_delta="unknown"` only allowed in exploration rounds.
+- `selection_reason` MUST cite at least one unpicked route's trade-off by id ("picked highest est delta" alone insufficient).
+- `exploration_round=true` allowed for ≤2 consecutive rounds (rule #2 check 10).
 
-- `metric_delta` — change in target metric this round (positive =
-  improvement under min/max declared in program.md Metric). May be
-  `null` if no eval ran (must pair with `exploration_round: true` and
-  `blocker_status` in `{removed, partially}` or `mission_relevance` that
-  explains the round's role as setup-for-next-round).
-
-- `blocker_status` — `removed` if a blocker was retired this round;
-  `partially` if blocker chain advanced but not finished; `blocked_on:<dep>`
-  if blocked on a specific dependency (named); `n/a` if round did not
-  target a blocker.
-
-- `mission_relevance` — single sentence connecting the round's work
-  back to the program.md Goal. Forbidden phrases: "exploring", "learning
-  more", "investigating", "trying" — these are exploration-disguising
-  phrases. If the round is genuinely exploration, set `exploration_round:
-  true` and explain in selection_reason what bounded question is being
-  answered.
-
-  **v2.16 trace requirement (commit-gate check 8 extension)**: when
-  rule #16 Program Contract Gate is in effect (i.e., program.md has a
-  `## Takeaway` section + round-0 was confirmed), `mission_relevance`
-  MUST contain ≥1 verbatim or paraphrased phrase from
-  `Takeaway.Validated_by` (the round-0 declared validation source).
-  Paraphrase requires the verbatim original phrase cited inline,
-  e.g., `mission_relevance: "advances scanner.py replay-determinism
-  (Takeaway.Validated_by: 'WS replay produces byte-identical fills')"`.
-  Quote-grep mechanism, same as rule #8 fuzzy-ground. Untraceable
-  mission_relevance → check 8 fails → revert. This closes the gap
-  where mission_relevance could be a vibe ("this serves the goal
-  somehow") rather than a specific contract trace ("this advances the
-  Validated_by criterion declared at round-0").
-
-- `candidate_routes` — ARRAY OF ≥2 entries. The mutator MUST generate
-  at least 2 distinct routes per round and document them, even if one
-  is obviously chosen. Single-route rounds are commit-gate fail. Routes
-  unselected this round are mineable by future rounds via reject-pool
-  mining (Frame-break Protocol step 1). `est_metric_delta` may be
-  `"unknown"` ONLY for exploration rounds.
-
-- `selected_route_id` — id of chosen route (must match an entry in
-  candidate_routes).
-
-- `selection_reason` — must reference at least one unpicked route's
-  trade-off by id (e.g., "route-b est cheaper but smaller delta;
-  route-c blocked on integration we don't have"). "Picked highest est
-  delta" alone is insufficient — must explain why the alternatives
-  were rejected.
-
-- `exploration_round` — boolean. `true` allows null metric_delta and
-  `unknown` est_metric_delta in candidate_routes, but commit-gate check
-  10 limits consecutive exploration rounds to 2.
-
-**Why**: a 56-round PM campaign showed that without a per-round goal-anchor, attacks become self-justifying ("this passed all attack classes" → commit) regardless of mission progress. Mission Thread makes goal-relevance a structural per-round artifact, not a vibe. Commit-gate check 10 reverts rounds with `metric_delta=0 AND blocker=n/a AND exploration=false`.
+**Why**: without per-round goal-anchor, attacks become self-justifying ("passed all classes → commit") regardless of mission progress. Mission Thread makes goal-relevance a structural per-round artifact. Rule #2 check 10 reverts rounds with `metric_delta=0 AND blocker=n/a AND exploration=false`.
 
 ## 15. Evidence Class enum in adversary header (v2.15)
 
@@ -646,777 +534,201 @@ Choose the strongest class ACTUALLY exercised this round. Inflating
 the class (claiming `live` when only `paper` ran) is silent
 fabrication; rule #11's nonce-friction defense applies.
 
-## 16. Program Contract Gate (v2.16) — round-0 authoring + confirmation
+## 16. Program Contract Gate — round-0 authoring + confirmation
 
-Before round 1 hypothesizes anything, the loop runs a Round-0 Program
-Contract Gate. Without this gate, fuzzy or shallow program.md leaks
-the upstream cause that v2.15's Mission Thread cannot fix from below
-(every paraphrase of a fuzzy goal is more fuzz). Rule #16 enforces:
-hard checklist + Takeaway-as-derived-contract + measured baseline +
-file-gated program-adversary + content hash + TTY-aware confirmation.
-
-The protocol below is mandatory. Skipping any step = round 1 refuses
-to start (`status: gate-failed-terminal`).
+Before round 1, run hard checklist + Takeaway-as-derived-contract + measured baseline + file-gated program-peer-challenge + content hash + TTY-aware confirmation. Skipping any step → `status: gate-failed-terminal`.
 
 ### A. Hard checklist (binary, fast-fail)
 
-Computed before adversary spawn or eval call. Refuse start on any
-failure.
+- **Goal** (≤200 chars, one line) — MUST contain measurable noun (whitelist: `number | percentage | sharpe | recall | runtime | file-count | pass-rate | precision | latency | throughput | bytes | count`). Standalone process verbs forbidden (`improve | better | investigate | explore | study | examine | analyze`).
+- **Target** — paths inside-repo, parent dir exists, each path EITHER exists OR has explicit `create:` marker.
+- **Eval** — shell-runnable (`bash -c <line>` → numeric stdout) OR `self-judge` with `Eval ground:` per rule #8.
+- **Metric** `<name>: <baseline> <direction> <tolerance>` — direction ∈ {min, max}; tolerance defaults by type (`pass-rate / file-count / count` → exact 0; `float / runtime` → epsilon = max(1e-9, 0.01 × |baseline|); noisy benchmarks → repeated_median 5 runs).
+- **Strategy** — ≥2 axes (single-axis missions exit at rule #17 Pass 0 triage).
+- **Attack Classes** — ≥1 named library or custom extension.
+- **Takeaway** section present, see B.
 
-- **Goal**: one line, ≤200 chars. MUST contain a measurable noun
-  (whitelist: `number | percentage | sharpe | recall | runtime |
-  file-count | pass-rate | precision | latency | throughput | bytes |
-  count`). Forbidden as standalone Goal verbs (no measurable noun
-  attached): `improve | better | investigate | explore | study |
-  examine | analyze`. Truly unspecified-metric tasks belong in
-  `ce-brainstorm`, NOT abelian.
-- **Target**: list of paths. Each path's parent directory MUST exist.
-  Each path MUST either (a) exist (file or directory), OR (b) include
-  an explicit `create:` marker (e.g., `Target: docs/new-design.md
-  create:`) declaring the path will be created. Inside-repo check
-  required (no `..` escape, no absolute paths outside repo root).
-- **Eval**: shell-runnable command (`bash -c <line>` returns 0 with
-  numeric stdout) OR `self-judge` mode with `Eval ground:` declared
-  per rule #8.
-- **Metric**: `<name>: <baseline> <direction> <tolerance>`. Direction
-  ∈ `{min, max}`. **Tolerance** required (v2.16) — defaults by metric
-  type when omitted: `pass-rate / file-count / count` → `exact (0)`;
-  `float / runtime` → `epsilon = max(1e-9, 0.01 × |baseline|)`; noisy
-  benchmarks → `repeated_median (5 runs)`. Tolerance enables baseline
-  validation in step C without rejecting legitimate measurement noise.
-- **Strategy**: ≥2 axes (chains C>1 and co-research depend on
-  diversity; single-axis means use a different review tool, not
-  abelian). **v3.0 update**: with unilateral mode removed in v3.0,
-  the v2.17 single-axis exception no longer applies — Strategy ≥2
-  is the universal rule. Rule #17 Pass 0 triage classifying
-  `single-axis` now exits with reroute diagnostic instead of running
-  as abelian.
-- **Attack Classes**: ≥1 named library from {default, doc-class,
-  research-class, audit-class, decision-class} OR ≥1 custom domain
-  extension.
-- **Takeaway section** (NEW v2.16, see B below): present with all 3
-  required fields populated.
-
-### B. Takeaway = derived contract (3 fields, not parallel truth)
+### B. Takeaway = derived contract (3 fields)
 
 ```
 ## Takeaway
 - Success looks like: <observable end-state, ≤2 lines>
-- Validated by: <eval/metric/artifact, MUST be grep-able / runnable /
-  countable per rule #8 fuzzy-ground criterion 4>
+- Validated by: <eval/metric/artifact, grep-able / runnable / countable>
 - Constraints: <≤2 lines>
 ```
 
-**Quote-grep + semantic linkage** (combines round-1 and round-2 codex
-review):
+**Quote-grep + semantic linkage** (both required, not just quote-grep — the latter alone is theatre):
+- `Success looks like` cites Goal phrase verbatim/paraphrased AND includes Metric `name` + `direction` keywords.
+- `Validated by` cites Eval/Metric phrase AND is grep-able (literal pattern in named file) / runnable (shell command) / countable. Aesthetic / "feels right" / "reader can follow" → rejected per v2.14 doc-task criterion 4.
+- `Constraints` cites ≥1 actual prohibition from program.md `## Constraints` verbatim/paraphrased.
 
-- `Success looks like` MUST: (a) cite a verbatim or paraphrased phrase
-  from `Goal` (paraphrase requires verbatim original cited inline);
-  AND (b) include the Metric `name` AND `direction` keywords.
-- `Validated by` MUST: (a) cite a verbatim or paraphrased phrase from
-  `Eval` or `Metric`; AND (b) be grep-able (a literal pattern in a
-  named file), runnable (a shell command), or countable (a measurable
-  count). Aesthetic / "feels right" / "reader can follow" =
-  rejected (same protocol as v2.14 doc-task cross-attack criterion 4).
-- `Constraints` MUST cite ≥1 actual prohibition from program.md
-  `## Constraints` section verbatim or paraphrased.
+`Estimated horizon` / `Estimated cost` deliberately absent — they re-introduce v2.9-removed cap-thinking. Cost shape (C×L×M, peer config) printed informational in F, not committed as contract.
 
-Quote-grep alone is theatre (codex round-2 MAJOR-2: "Goal: optimize
-speedup → Takeaway: speedup achieved" passes lexically but means
-nothing). Quote-grep + semantic linkage is structural. Gate fails
-on any field violating either component.
+### C. Round-0 baseline eval
 
-**Notably absent**: `Estimated horizon`, `Estimated cost`. These were
-in the round-1 draft and were cut per codex round-1 attack 6 — they
-re-introduce v2.9-removed cap-thinking through the back door. Cost
-shape (C×L×M, adversary mode, "mechanism-converge; not a cap") is
-printed as informational summary in step F, but not committed as
-program.md contract.
+Shell-runnable Eval runs ONCE against unmutated tree → `$RUN_DIR/round-0/eval.txt`. Validate parsed value against `Metric.baseline ± Metric.tolerance`. Mismatch → refuse OR `--accept-measured-baseline` (overwrites baseline + re-confirmation). Self-judge mode runs frozen rubric once + stores artifact (rule #8 fuzzy-ground).
 
-### C. Round-0 baseline eval (close v2.15 metric_delta integrity)
+Closes the v2.15 gap where `metric_delta > 0` (rule #2 check 10) was poisoned by declarative baselines.
 
-If Eval is shell-runnable, the loop runs it ONCE at round-0 against
-the unmutated baseline working tree. Output → `$RUN_DIR/round-0/eval.txt`.
-Compare parsed value against `Metric.baseline` within `Metric.tolerance`:
+### D. Round-0 program-peer-challenge (rule #1 + #11 inherited)
 
-- Match → store `state.round_0.baseline_eval.matches_declared = true`,
-  proceed.
-- Mismatch (beyond tolerance) → refuse start with concrete error
-  (declared baseline 0.80, measured 0.31 at tolerance 0.01); user
-  either fixes program.md baseline OR re-runs with `--accept-measured-baseline`
-  (overwrites Metric.baseline in program.md, requires re-confirmation).
+Independent of `--peers=` choice, round-0 spawns a single dissect-template peer (~$0.10) — cross-family diversity matters per-round, not at round-0 binary gate. Locked attack classes: `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity, c4-authority-by-citation, d4-scope-creep}` (program-contract integrity set).
 
-If Eval is `self-judge`, the round-0 baseline runs the frozen rubric
-once on the unmutated state → store judge artifact at
-`$RUN_DIR/round-0/eval.txt` (with rule #8 fuzzy-ground discipline).
-
-Round-0 baseline closes the v2.15 gap where `metric_delta > 0` (rule
-#2 check 10) was poisoned by a declarative baseline that didn't match
-reality.
-
-### D. Round-0 program-adversary (rule #1 + #11 inherited)
-
-Independent of `--adversary` flag, round-0 ALWAYS spawns dissect
-(cheap universal sanity, ~$0.10) — cross-model adversary diversity
-matters per-round, not at round-0 binary gate. Per-round `--adversary=codex|both`
-choice is preserved for rounds 1+.
-
-Spawn: `Agent(general-purpose)` with `prompts/dissect.md` inlined against
-program.md as input. Attack classes locked to the program-contract
-set: `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity,
-c4-authority-by-citation, d4-scope-creep}`. These five are the
-program-contract-integrity classes:
-
-- c1: does the doc claim/proposal exceed Goal? (scope drift)
-- c2: what unstated logical premise must hold for this contract to
-  work? (hidden assumption)
-- c3: does "metric" mean different things in Goal / Metric / Eval /
-  Takeaway? (definition elasticity)
-- c4: does Takeaway.Validated_by reference files / commands / claims
-  that exist? (authority-by-citation)
-- d4: does the proposed action stretch beyond stated decision boundary?
-  (scope creep)
-
-Output: `$RUN_DIR/round-0/program-adversary.txt`. Header (rule #11
-inherited verbatim):
-
-```
-ABELIAN-PEER-v1
-run_id: <state.run_id>
-round: 0
-peer: program-gate
-nonce: <state.round_0.peer_nonce>
-started_at: <ISO 8601 with milliseconds>
-verdict: <single-line verdict>
-evidence_class: theoretical
----
-<attack content begins; criterion-4 form per v2.14 doc-task>
-```
-
-Severity grades:
-- BLOCKER → refuse start.
-- MAJOR → print to stderr + write to escalations.md, allow start.
-- MINOR → write to escalations.md, allow start.
-
-Invalid output (header missing OR criterion-4 violation) → respawn
-with explicit "criterion-4 violation, retry" prompt. After 2 respawn
-failures → refuse start with `gate-failed-terminal` status.
+Output: `$RUN_DIR/round-0/program-peer-challenge.txt` with rule #11 ABELIAN-PEER-v1 header (`peer: program-gate`, `evidence_class: theoretical`). Severity: BLOCKER → refuse start; MAJOR → stderr + escalations.md; MINOR → escalations.md only. Invalid output (header missing OR criterion-4 violation) → respawn (max 2) → `gate-failed-terminal`.
 
 ### E. Program contract hash
 
-After A–D pass, normalize and hash the program-contract sections:
+After A-D pass, sha256 over normalized sections: `Goal | Task class | Target | Eval | Eval ground | Metric | Constraints | Strategy | Cells | Attack Classes | Takeaway`. `History` excluded. Stored in `state.round_0.program_contract_hash`.
 
-```
-Goal | Task class | Target | Eval | Eval ground | Metric |
-Constraints | Strategy | Cells | Attack Classes | Takeaway
-```
-
-`History` excluded (auto-populated by loop; not part of contract).
-
-Normalization: strip leading/trailing whitespace per section, collapse
-multi-blank-lines, lower-case section header markers. Hash:
-`sha256(normalized_concat)`. Store in
-`state.round_0.program_contract_hash`.
-
-**Per-round refresh** (rule #3 extension): when the loop re-cats
-program.md at round-N step 0, recompute the hash and compare to
-`state.round_0.program_contract_hash`. Mismatch →
-`state.status = "contract-drift-stopped"` (NOT ordinary
-`drift-stopped`) + `state.round_0.reconfirmation_required = true`.
-Resolution paths:
-
-- New run with new RUN_ID and new hash, OR
-- `--reconfirm-gate` flag re-runs full round-0 (steps A–F),
-  prints new takeaway + new estimated cost, awaits new "go".
-  Stores new hash, sets `reconfirmation_required = false`. Loop
-  resumes from round 1 of the same RUN_ID with the new contract.
-
-Hash overhead per round: ~1ms over ~11 sections. Documented as
-load-bearing per rule #3 extension; users should expect it in audit
-trails.
+**Per-round refresh** (rule #3 extension): re-cat program.md, recompute hash, compare. Mismatch → `state.status = "contract-drift-stopped"` (distinct from rule #4 `drift-stopped`) + `reconfirmation_required = true`. Resolution: new RUN_ID OR `--reconfirm-gate` flag re-runs full round-0 with new hash.
 
 ### F. Confirmation gate (TTY-aware, single flag)
 
-After A–E pass, the loop prints to stderr:
+After A-E pass, print stderr summary (Takeaway + baseline eval + peer-challenge verdict + contract hash + cost shape) and:
+- **Interactive TTY**: wait stdin "go"/"no" — no timeout. Ctrl-C → `interrupted`.
+- **Non-TTY**: refuse start unless `--auto-launch-after-gate` (records `auto_launched: true` + `bypass_reason`).
 
-```
-=== abelian round-0 program contract gate PASSED ===
+### G. Migration: `--migrate-takeaway`
 
-Takeaway:
-  Success looks like: <verbatim from Takeaway>
-  Validated by: <verbatim>
-  Constraints: <verbatim>
-
-Baseline eval: <value> (matches declared, tolerance <tol>)
-Program-adversary: <verdict> (BLOCKER 0 / MAJOR <n> / MINOR <n>)
-Contract hash: sha256:<first 12 chars>...
-
-Cost shape (informational, NOT a cap):
-  Mode: <unilateral|co-research>; chains <C>, depth <L>, candidates <M>
-  Adversary: <dissect|codex|both>
-  Per-round adversary calls: <C × L>
-  Termination: mechanism-converge per rule #6 (no rounds/budget cap)
-
-Reply 'go' to launch, 'no' to abort, edit program.md and re-run otherwise.
-```
-
-**Behavior by execution context**:
-
-- **Interactive TTY** (`isatty(0)` true AND `isatty(2)` true): wait
-  on stdin for "go" / "no" line. **No timeout** — Stephen leaves runs
-  unattended. Ctrl-C → `state.status = "interrupted"` + write
-  state.json + exit cleanly.
-- **Non-interactive** (cron / piped stdin / tmux background): refuse
-  start unless `--auto-launch-after-gate` flag explicit. With the
-  flag, store `state.round_0.{auto_launched: true, bypass_reason:
-  "non-tty + --auto-launch-after-gate"}`. Without, exit with
-  `gate-failed-terminal` and informative message ("non-TTY launch
-  requires --auto-launch-after-gate; aborting").
-
-Single flag covers both batch-confirm-bypass and non-TTY autostart
-(codex round-2 verdict 2: same security event — bypassing human stdin
-confirmation after gates pass).
-
-### G. Migration: `--migrate-takeaway` (drafts only, never autostart)
-
-For v2.5–v2.15 program.md missing the Takeaway section, the loop
-provides an opt-in migration path:
-
-```
-abelian program.md --migrate-takeaway
-```
-
-Behavior:
-
-1. Read program.md sections (Goal, Eval, Metric, Constraints).
-2. Draft a Takeaway section satisfying B (Success cites Goal +
-   Metric name+direction; Validated_by cites Eval/Metric and is
-   grep-able / runnable; Constraints cites ≥1 actual prohibition).
-3. Write the draft to program.md (in-place edit) + emit a unified
-   diff to stdout for user review.
-4. **Exit immediately**. Never autostart the loop after migration.
-   User reviews + commits + re-runs without `--migrate-takeaway`.
-
-Migration is intentionally narrow (Takeaway only, not other v2.16
-fields). Other gaps (no baseline eval, Strategy <2 axes, missing
-Eval ground) require manual fix. Reason: automated migration of more
-fields = silent fabrication of contract by mutator. Migration is the
-place where loud-fail beats quiet-helpful.
+Drafts ONLY the Takeaway section satisfying B → emits unified diff → exits. Never autostart. Other v2.16 gaps (no baseline, Strategy <2, missing Eval ground) require manual fix — automated migration of more fields = silent fabrication.
 
 ### H. state.round_0 schema
 
 ```json
 "round_0": {
-  "checklist_passed": true,
-  "checklist_failures": [],
-  "baseline_eval": {
-    "value": 0.42,
-    "file": "round-0/eval.txt",
-    "tolerance": 0.01,
-    "matches_declared": true
-  },
-  "program_adversary": {
-    "file": "round-0/program-adversary.txt",
-    "verdict": "<single line from header>",
-    "evidence_class": "theoretical",
-    "blockers": 0,
-    "majors": 1,
-    "minors": 2,
-    "adversary_nonce": "...",
-    "adversary_started_at": "..."
-  },
-  "takeaway": {
-    "success_looks_like": "...",
-    "validated_by": "...",
-    "constraints": "..."
-  },
+  "checklist_passed": bool,
+  "checklist_failures": [str],
+  "baseline_eval": { "value": float, "file": str, "tolerance": float, "matches_declared": bool },
+  "program_peer_challenge": { "file": str, "verdict": str, "evidence_class": "theoretical",
+                              "blockers": int, "majors": int, "minors": int,
+                              "peer_nonce": str, "peer_started_at": iso },
+  "takeaway": { "success_looks_like": str, "validated_by": str, "constraints": str },
   "program_contract_hash": "sha256:...",
-  "user_confirmed_at": "2026-05-03T15:30:00.000-0700",
-  "auto_launched": false,
-  "bypass_reason": null,
-  "reconfirmation_required": false
+  "user_confirmed_at": iso | null,
+  "auto_launched": bool,
+  "bypass_reason": str | null,
+  "reconfirmation_required": bool
 }
 ```
 
-### I. Frame-break Protocol step 4 boundary (rule #16 ↔ Frame-break)
+### I. Frame-break Protocol step 4 boundary
 
-When Frame-break Protocol step 4 (goal re-paraphrase from current
-state) is executing, distinguish two outcomes:
-
-- **In-frame re-paraphrase** (default): Takeaway and program-contract
-  hash still valid; mutator generates fresh paraphrase from current
-  metric vs target gap, allows ≤2 speculative routes
-  (`est_metric_delta: "unknown"`). Loop continues normally.
-- **Contract invalidity surfaces**: any of the following → abort to
-  round-0 with `state.round_0.reconfirmation_required = true`:
-  - `metric_delta` direction inverts mid-run (sign change with
-    absolute value ≥ baseline_tolerance) → metric no longer measures
-    the goal as Takeaway claimed.
-  - `Takeaway.Validated_by` stops being grep-able / runnable (e.g.,
-    cited file deleted, cited shell command missing).
-  - Program-contract hash mismatch surfaces during refresh.
-
-Aborting to round-0 is the correct response to contract invalidity:
-the LLM cannot creatively escape a broken contract; only the human
-can re-confirm.
+Step 4 (goal re-paraphrase from current state):
+- **In-frame** (default): contract still valid; mutator paraphrases from current metric vs target gap; allows ≤2 speculative routes.
+- **Contract invalidity** → abort to round-0 + `reconfirmation_required = true` when ANY of: metric_delta sign inverts (≥ baseline_tolerance) / Takeaway.Validated_by no-longer-runnable / contract-hash mismatch surfaces. LLM cannot creatively escape broken contract — only human re-confirms.
 
 ### Empirical anchor
 
-A 56-round PM campaign closed peer-clean across 7 attack classes while
-the mission metric stayed flat. Rule #14 + #15 fix per-round drift but
-assume program.md itself is sharp at round-0. Rule #16 closes the
-upstream cause: contract checked, measured, hashed, human-signed before
-any round runs.
+A 56-round PM campaign closed peer-clean across attack classes while mission metric stayed flat. Rule #14 + #15 fix per-round drift but assume program.md is sharp at round-0. Rule #16 closes the upstream cause.
 
-## 17. Adversarial Goal Sharpening Protocol (v2.17, opt-in)
+## 17. Goal-Authoring Stage (opt-in)
 
-Rule #16 enforces program.md sharpness but REJECTS fuzzy program.md
-(measurable-noun whitelist, baseline tolerance, Takeaway derivation).
-This is correct discipline — but a fuzzy mission like "improve trading
-internal" has no path from user to abelian beyond manual program.md
-authoring or routing to ce-brainstorm.
-
-OKR (objective → key results → tasks) is one method to compile fuzzy
-goal to actionable spec, but it relies on hierarchical decomposition
-done by the user. Rule #17 is abelian's native answer: **adversarial
-goal sharpening** — recursive application of the loop's own
-propose+attack+converge machinery to goal-authoring itself, producing
-a rule #16-compliant program.md draft from a fuzzy mission.
-
-Opt-in. Does not run unless explicitly triggered. Rule #16 round-0
-gate runs unchanged after sharpening produces draft.
+Compiles fuzzy mission to rule #16-compliant program.md draft via per-field adversarial cycles. Recursive application of rule #1 + #11 + #18 propose+attack+converge to goal-authoring itself. After sharpening produces draft, rule #16 round-0 gate runs unchanged.
 
 ### Trigger
 
-- `abelian --mission "<fuzzy text>"` (string, explicit flag)
-- `abelian --mission-file <path>` (file, explicit flag)
-- File auto-detect: `abelian <existing-file>` where the file LACKS a
-  `## Goal` section → orchestrator prompts "this looks like a draft,
-  not a program.md. Run goal-authoring stage to compose it? (yes / no)".
-  Bare strings to `abelian` are NEVER auto-classified as fuzzy
-  missions (closes typo-as-mission risk).
+- `abelian --mission "<text>"` (string, explicit) | `abelian --mission-file <path>` (file)
+- File auto-detect: existing file lacking `## Goal` → orchestrator prompts user (yes/no)
+- Bare strings to `abelian` NEVER auto-classified (typo-as-mission risk)
 
-**v3.0 unification**: prior `abelian sharpen "<mission>"` subcommand
-removed. Goal-authoring is a stage of the unified loop triggered via
-explicit `--mission` flag. Same propose+attack discipline applied to
-goal-authoring artifact (program.md draft) as is applied later to
-round-mutation artifacts.
+### 5-pass protocol
 
-### Pass 0 — Triage
+| # | Output | Cost | Locked attack classes | Converge predicate |
+|---|---|---|---|---|
+| 0 — Triage | classification | ~$0.05 | n/a | classification commits |
+| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | ~$0.5 | c1, c2 | attack_survival + mission_traceability + rule_16_composability (Goal clause) |
+| 2 — Metric Forge + Runnable Eval | metric + runnable Eval shell + dry-run-parse | ~$0.5 | c3, c4 | + Eval parses to number AND cited files/commands exist |
+| 3 — Lever + Constraint | ≥2 Strategy axes + Constraints (Pass 3 attack byproduct) | ~$0.5 | d4, c1 | + ≥2 surviving axes |
+| 4 — Takeaway Derivation | mechanical compose Takeaway 3 fields per rule #16 B | $0 | n/a (mechanical_validator) | source_coverage + rule_16_B_quote_grep + semantic_linkage |
 
-Single LLM call (~$0.05). Classify the fuzzy mission:
+**Triage outcomes**: `sharp` (exit, "write program.md directly") | `fuzzy-but-grounded` (proceed) | `fuzzy-ungrounded` (exit, "route to ce-brainstorm") | `single-axis` (exit, "use a separate review tool — abelian's diversity engine has no value here").
 
-- **`sharp`** — mission already program.md-grade (has measurable
-  noun + grounded reference). Output diagnostic: "Already sharp;
-  write program.md and run `abelian program.md` directly." Exit
-  non-zero. Do NOT proceed to Pass 1+.
-- **`fuzzy-but-grounded`** — missing structure but has reference
-  points (existing files / specs / verbatim user message). Proceed
-  to Pass 1.
-- **`fuzzy-ungrounded`** — no concrete reference points to ground
-  outcome. Output diagnostic: "Route to `ce-brainstorm`; mission
-  has no ground source for sharpening." Exit non-zero.
-- **`single-axis`** — measurable noun present + 1 obvious mechanism.
-  **v3.0 change**: exits with reroute diagnostic ("Mission is
-  single-axis verification; abelian's diversity engine has no value
-  here. Use a separate review tool."). Previously (v2.17) proceeded
-  with `recommended_mode: unilateral` — but v3.0 dropped unilateral
-  mode, so single-axis missions cannot run as abelian.
-
-Output: `$RUN_DIR/sharpening/pass-0/triage.md` (classification +
-reasoning + rejected_classifications array).
+**Per-pass artifacts**: `$RUN_DIR/sharpening/pass-N/{peer-A.md, peer-B.md, peer-A.txt, peer-B.txt, converged.md}` with rule #11 ABELIAN-PEER-v1 header (`peer: sharpen-pass-N`, `evidence_class: theoretical`).
 
 ### Bounded reconnaissance
 
-Sharpening runs reconnaissance ONLY within these bounds. Out-of-bound
-scans are forbidden (anti-fabrication: more reconnaissance = more
-authority the LLM can fabricate from weak hits):
+Reads ONLY: fuzzy mission text + `--target-hint` paths + top-3-noun keyword grep (≤1 grep per noun) + last 200 lines session history. Forbidden: full repo TODOs, CLAUDE.md, full git log. Each entry → trace.json `reconnaissance[]` with `{command, hit_count, selected_excerpt_path, selected_excerpt_text, citation_type: user_message | target_hint | grep_hit | session_tail}`.
 
-- Fuzzy mission text (always)
-- `--target-hint <paths>` flag values, if passed (allowed file reads)
-- Top-3 noun keyword grep across repo (limited to 1 grep invocation
-  per noun; hit count + selected excerpt recorded)
-- Last 200 lines of session history (Claude Code only; codex-cli
-  does not have access — record `session_tail: not_available`)
+### Mechanical converge predicate (Pass 1-3)
 
-Forbidden (do not scan): full repo TODOs, CLAUDE.md, full git log,
-unrelated specs.
+3 conditions, all required:
+- `attack_survival` — no BLOCKER from peer challenges
+- `mission_traceability` — surviving candidate contains ≥1 verbatim/paraphrased phrase from fuzzy mission text
+- `rule_16_composability` — surviving fields satisfy rule #16 hard-checklist clause for that field
 
-Each reconnaissance entry recorded in `trace.json.reconnaissance[]`:
+Pass 4 substitutes `mechanical_validator_passed` (3 conditions: source_coverage + rule_16_B_quote_grep + semantic_linkage). Pass 4 fails → route back to Pass 2 with c3-definition-elasticity input. Pass 1-3 mutual-KILL after 2 retries → re-run Pass 0 triage; abort if re-triage outputs `fuzzy-ungrounded`.
 
-```json
-{
-  "command": "grep -nE 'pattern' src/",
-  "hit_count": 7,
-  "selected_excerpt_path": "src/foo.py:42-45",
-  "selected_excerpt_text": "...",
-  "citation_type": "user_message | target_hint | grep_hit | session_tail"
-}
-```
+### Composition + rule #16 takeover
 
-### Pass 1 — Outcome Distillation + Grounding
+Draft assembled from passes (Goal from Pass 1, Eval from Pass 2, Strategy + Constraints from Pass 3, Takeaway from Pass 4). `Eval ground:` always includes (d) verbatim fuzzy_mission. Draft → rule #16 round-0 gate runs as if user wrote it; Pass 2's pre-validated Eval command closes the `TBD-measure-at-round-0` placeholder.
 
-Input: fuzzy mission + bounded reconnaissance.
-
-peer-A and peer-B each propose ≥2 outcome candidates. Each candidate
-must:
-- Be observable end-state (not process), e.g., "scanner.py emits
-  byte-identical fills via WS replay" not "scanner gets better"
-- Cite ≥1 ground source (file path / user message quote / doc
-  reference) from reconnaissance bounds
-
-Adversary call (locked attack classes for Pass 1):
-- `c1-scope-drift` — does outcome already exceed mission?
-- `c2-hidden-assumption` — what unstated premise must hold?
-
-Mechanical converge predicate (3 conditions, all required):
-1. **`attack_survival`** — no BLOCKER from adversary
-2. **`mission_traceability`** — surviving outcome contains ≥1
-   verbatim or paraphrased phrase from fuzzy mission text
-3. **`rule_16_composability`** — outcome statable as one-line Goal
-   with measurable noun (rule #16 A clause for Goal)
-
-If predicate fails after 2 retries → mutual-KILL → re-run Pass 0
-triage with diagnostic ("might be ungrounded after all"); abort if
-re-triage classifies `fuzzy-ungrounded`.
-
-Output: `pass-1/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
-Adversary file inherits rule #11 header verbatim with `peer:
-sharpen-pass-1` and `evidence_class: theoretical`.
-
-### Pass 2 — Metric Forge + Runnable Eval
-
-Input: outcome + ground sources.
-
-peer-A and peer-B each propose ≥2 measurable proxies. Each candidate
-must include:
-- Metric `name`, `direction` (min/max), `tolerance` (defaults by type
-  per rule #16 A), `baseline: TBD-measure-at-round-0`
-- **Runnable Eval shell command** (string copy-pasteable). Loop
-  performs a dry-run parse to verify the command emits a number;
-  records `eval_dry_run_parse: {command, exit_code, stdout_tail,
-  parsed_value}` in trace.json.
-- For self-judge mode: rubric path + `Eval ground:` declarations
-  per rule #8
-
-Adversary call:
-- `c3-definition-elasticity` — does proxy mean the same thing across
-  Goal / Metric / Eval / Takeaway?
-- `c4-authority-by-citation` — do referenced files / commands exist?
-
-Converge predicate:
-1. `attack_survival` — no BLOCKER
-2. `mission_traceability` — metric name traceable to mission/outcome
-3. `rule_16_composability` — Eval command parses to a number AND
-   files/commands referenced exist (rule #16 A clauses for Eval +
-   Metric)
-
-Output: `pass-2/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
-
-### Pass 3 — Lever + Constraint (merged from rounds-1 review per Route A)
-
-Input: metric.
-
-peer-A and peer-B each propose ≥2 mechanisms (Strategy axes). Each
-mechanism includes inline "if you do X, you'll break Y" Constraint
-candidates.
-
-Adversary call:
-- `d4-scope-creep` — does mechanism stretch beyond decision boundary?
-- `c1-scope-drift` — does mechanism exceed outcome?
-
-Constraint extraction is a Pass 3 byproduct: surviving "breaks Y"
-attacks become candidate Constraints. 1 peer-audit pass distinguishes
-real invariants from over-cautious Y.
-
-Converge predicate:
-1. `attack_survival` — no BLOCKER
-2. `mission_traceability` — mechanism traceable to metric
-3. `rule_16_composability` — `Strategy ≥2 surviving axes` (v3.0:
-   single-axis triage exited at Pass 0; only fuzzy-but-grounded
-   missions reach Pass 3) AND Constraints set non-empty
-
-Output: `pass-3/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
-The converged.md contains BOTH Strategy axes AND Constraints set.
-
-### Pass 4 — Takeaway Derivation (mechanical, no LLM)
-
-Mechanical composition: derive Takeaway 3 fields per rule #16 B from
-Pass 1 outcome + Pass 2 metric + Pass 3 constraints. No LLM call. No
-adversary call.
-
-Mechanical validator (`mechanical_validator_passed`, replaces
-attack_survival for this pass — codex round-2 verdict 1):
-1. **`source_coverage`** — Pass 1 outcome present, Pass 2 metric
-   present, Pass 3 constraints present
-2. **`rule_16_B_quote_grep`** — each Takeaway field's quote-grep
-   against Goal/Eval/Metric/Constraints passes
-3. **`semantic_linkage`** — Success cites Goal+Metric, Validated_by
-   cites Eval/Metric+grep-able/runnable, Constraints cites prohibition
-   (rule #16 B requirements)
-
-If validator fails → route back to Pass 2 with diagnostic ("metric
-proxy failed Takeaway composability"). Pass 2 re-runs with the failure
-context as additional adversary attack class for c3-definition-elasticity.
-
-Output: `pass-4/converged.md`.
-
-### Composition
-
-After all passes converge, the loop assembles a `program.md` draft:
-
-| program.md section | Source |
-|---|---|
-| `## Goal` | Pass 1 outcome restated as one-line goal with Pass 2 metric noun |
-| `## Task class` | Derived from sharpening session (code if Pass 1-3 cited code; else doc/research/audit/decision) |
-| `## Target` | File paths surfaced in Pass 1 grounding + Pass 3 levers |
-| `## Eval` | Pass 2 runnable shell command |
-| `## Eval ground` | (d) verbatim fuzzy_mission as fenced block; (b)/(c) reconnaissance file references |
-| `## Metric` | Pass 2 (with `baseline: TBD-measure-at-round-0`) |
-| `## Constraints` | Pass 3 byproduct |
-| `## Strategy` | Pass 3 surviving axes (≥2 normally; 1 if single-axis triage) |
-| `## Attack Classes` | Derived (default for code; +library based on Task class) |
-| `## Takeaway` | Pass 4 mechanical |
-
-### Rule #16 takeover
-
-After draft composed, sharpening exits and rule #16 round-0 gate runs
-as if the user wrote program.md. Rule #16 step C runs baseline eval
-against Pass 2's runnable Eval command (closes the `TBD-measure-at-round-0`
-placeholder; verified ahead of time via Pass 2 dry-run-parse). Rule
-#16 step E hashes the composed contract.
-
-If rule #16 finds issues (program-adversary BLOCKER, contract hash
-disagreement, etc.), the user can edit the program.md draft manually
-or re-run sharpening with a refined fuzzy mission.
-
-### state.sharpening schema
+### state.sharpening schema (top-level)
 
 ```json
 "sharpening": {
-  "fuzzy_mission_verbatim": "...",
-  "triage_classification": "fuzzy-but-grounded | sharp | fuzzy-ungrounded | single-axis",
-  "started_at": "...",
-  "passes": [
-    {"n": 0, "name": "triage", ...},
-    {"n": 1, "name": "outcome-grounding", ...},
-    {"n": 2, "name": "metric-eval", ...},
-    {"n": 3, "name": "lever-constraint", ...},
-    {"n": 4, "name": "takeaway-derivation", ...}
-  ],
-  "program_md_draft_path": "...",
-  "trace_json_path": "...",
-  "recommended_flags": ["--mode=co-research" | "--mode=unilateral"]
+  "fuzzy_mission_verbatim": str,
+  "triage_classification": "sharp | fuzzy-but-grounded | fuzzy-ungrounded | single-axis",
+  "started_at": iso,
+  "passes": [{ "n": int, "name": str, "converged_to": str, "files": [str], "user_intervention": null }],
+  "program_md_draft_path": str,
+  "trace_json_path": str,
+  "recommended_flags": ["--peers=claude+claude" | "--peers=claude+codex"]
 }
 ```
 
 ### trace.json schema (audit trail)
 
-```json
-{
-  "fuzzy_mission_verbatim": "...",
-  "triage": {
-    "classification": "fuzzy-but-grounded",
-    "reasoning": "...",
-    "rejected_classifications": ["sharp", "single-axis", "fuzzy-ungrounded"]
-  },
-  "reconnaissance": [
-    {"command": "...", "hit_count": N, "selected_excerpt_path": "...",
-     "selected_excerpt_text": "...", "citation_type": "user_message"}
-  ],
-  "passes": [
-    {
-      "n": 1,
-      "name": "outcome-grounding",
-      "candidates": [
-        {"id": "outcome-A", "peer": "A", "text": "...",
-         "ground_citations": [...], "verdict": "rejected",
-         "rejected_by": "adversary BLOCKER c2-hidden-assumption"}
-      ],
-      "converge_predicate": {
-        "attack_survival": true,
-        "mission_traceability": true,
-        "rule_16_composability": true
-      },
-      "artifact_integrity": {
-        "path": "pass-1/converged.md",
-        "sha256": "...",
-        "nonce": "...",
-        "started_at": "...",
-        "verdict_line": "...",
-        "model_or_peer": "claude-opus-4.7",
-        "retry_count": 0
-      }
-    },
-    {
-      "n": 2,
-      "name": "metric-eval",
-      "candidates": [...],
-      "converge_predicate": {...},
-      "eval_dry_run_parse": {
-        "command": "python3 bench.py | tail -1",
-        "exit_code": 0,
-        "stdout_tail": "2.34",
-        "parsed_value": 2.34
-      },
-      "artifact_integrity": {...}
-    },
-    {
-      "n": 4,
-      "name": "takeaway-derivation",
-      "mechanical_validator_passed": {
-        "source_coverage": true,
-        "rule_16_B_quote_grep": true,
-        "semantic_linkage": true
-      },
-      "artifact_integrity": {"path": "pass-4/converged.md", "sha256": "...", "model_or_peer": null}
-    }
-  ],
-  "program_md_path": "program.md",
-  "recommended_flags": ["--mode=co-research"]
-}
-```
-
-`artifact_integrity` per pass enables full audit: any reader can
-verify the converged file's hash, the adversary nonce, the model that
-generated it, and the retry count without re-running the protocol.
+Per-pass `artifact_integrity`: `{path, sha256, nonce, started_at, verdict_line, model_or_peer, retry_count}`. Pass 2 adds `eval_dry_run_parse`: `{command, exit_code, stdout_tail, parsed_value}`. Top-level: `fuzzy_mission_verbatim`, `triage`, `reconnaissance[]`, `passes[]`, `program_md_path`, `recommended_flags`. Full schema verified against rule #18's CHALLENGE-mode falsification form.
 
 ### Cost
 
-- Pass 0 triage: ~$0.05
-- Pass 1-3: 2 peer + 1 adversary per pass = ~$0.5 each = $1.5
-- Pass 4: $0 (mechanical)
-- v2.17 sharpening total: ~$1.55-2.05
-- + rule #16 round-0 program-adversary: ~$0.10
-- = ~$1.65-2.15 per fuzzy mission
-
-100× ROI on a single 56-round-fuzz catch ($3-5 wasted on
-attack-clean-but-mission-flat rounds).
-
-### Fail-out paths
-
-- Pass 0 outputs `sharp` → exit non-zero, "Already sharp; write
-  program.md directly."
-- Pass 0 outputs `fuzzy-ungrounded` → exit non-zero, "Route to
-  `ce-brainstorm`."
-- Pass 1-3 mutual-KILL after 2 retries → re-run Pass 0 triage with
-  diagnostic. If re-triage outputs `fuzzy-ungrounded` → exit; else
-  retry the failed pass once with re-triage as input.
-- Pass 4 `mechanical_validator_passed` fails → route back to Pass 2
-  with the failure as additional c3-definition-elasticity attack input;
-  re-run Pass 2-3-4. If still fails after 1 retry, escalate to user
-  with diagnostic.
+~$1.65-2.15 per fuzzy mission ($1.55 sharpening + $0.10 round-0 program-peer-challenge). ROI: 100× on a single multi-round-fuzz catch.
 
 
-## 18. Asymmetric peer discipline (v3.0) — innovative-grounded propose, strictly-verification-oriented counter
+## 18. Asymmetric peer discipline — innovative-grounded propose, strictly-verification-oriented counter
 
-Every peer in abelian operates in two modes during a round / pass:
+Every peer operates in two modes per round/pass; conflating them collapses loop quality.
 
-- **PROPOSE mode** — generating a mutation, candidate route, outcome
-  distillation, metric forge, lever surfacing, alternative_routes
-  block, or any "what should we try?" output.
-- **COUNTER mode** — responding to another peer's attack on the peer's
-  own work. The rebuttal step where the attacked peer must defend or
-  concede.
+### PROPOSE mode: innovative AND grounded
 
-The disciplines are asymmetric. Conflating them collapses the loop's
-quality:
+When generating mutations, candidate routes, outcomes, metrics, levers, or alternative_routes:
+- **Innovative** — novel framings / mechanism enumeration / cross-domain analogues. Safe-incremental restatements of prior round ("extend X with...", "refine the existing...", "polish the current...") FORBIDDEN unless `exploration_round=true` AND ≥1 speculative route (`est_metric_delta: "unknown"` per rule #14).
+- **Grounded** — every proposal cites ≥1 anchor: file path + line range, command + actual output, or quoted user/spec/doc text with source. No vibes, no fabricated specifics, no authority-by-citation without citation existing (c4 generalized).
 
-### PROPOSE mode discipline: innovative AND grounded
+Commit-gate (rule #2 check 8) extends: any `mission_thread.candidate_routes` entry lacking grounding citation OR using safe-incremental phrasing without exploration_round=true → check fails → revert.
 
-**Innovative** — propose must surface novel framings, mechanism
-enumeration, cross-domain analogues, or speculative routes. Safe-
-incremental restatements of prior round's path = peer is collapsing
-to RLHF prior. Specifically forbidden phrases: "extend X with...",
-"refine the existing...", "polish the current..." when the path is
-already the obvious next step. If the only proposal a peer can
-generate is incremental, the peer must mark `exploration_round=true`
-and surface ≥1 SPECULATIVE route (`est_metric_delta: "unknown"` per
-rule #14).
+### COUNTER mode: strictly verification-oriented
 
-**Grounded** — every proposal must cite ≥1 anchor: file path + line
-range, command + actual output, or quoted user/spec/doc text with
-source. No vibes ("seems faster"), no fabricated specifics ("50%
-faster" without measurement), no authority-by-citation without the
-citation actually existing (rule #16 program-adversary class
-c4-authority-by-citation generalizes to all peer proposals here).
+When attacked on own mutation, response options are STRICTLY limited to:
 
-Commit-gate (rule #2 check 8) extends: when round has any
-`mission_thread.candidate_routes` entry whose `mechanism` field lacks
-a grounding citation OR uses safe-incremental phrasing without
-`exploration_round=true` justification → check 8 fails → revert.
+1. **Convert attack to probe + run** — regression test / benchmark / rubric criterion / shell command / grep pattern from attack's "this is wrong if X" form. Run. PASS → mutation survives attack. FAIL → mutation reverts on its branch.
+2. **Concede + revert** — accept without probe; mutation reverts. State logs `attacks_conceded`.
+3. **Mark non_codifiable + escalation_required** — attack genuinely cannot become a probe (purely qualitative). Mutation reverts; human reviews post-campaign. Counter cannot survive without falsifiable verification.
 
-### COUNTER mode discipline: strictly verification-oriented
+**Forbidden in COUNTER**: "I disagree because..." without probe / "the attack misunderstands..." without grep-able rebuttal / "this was already addressed" without line/commit cite / any argumentation that doesn't produce binary attack-falsified-or-mutation-reverts outcome.
 
-When peer-A's mutation is attacked by peer-B, peer-A's response
-options are **strictly limited** to:
-
-1. **Convert the attack to a probe and run it** — regression test,
-   benchmark input, rubric criterion, shell command, grep pattern,
-   or any falsifiable check derived from the attack's "this is wrong
-   if X" form (rule #14 + v2.14 doc-task cross-attack criterion 4).
-   Run the probe. If probe shows the attack's claim is false (X does
-   NOT hold), the mutation survives that attack. If probe shows the
-   attack's claim is true (X DOES hold), the mutation reverts on its
-   branch.
-
-2. **Concede and revert** — accept the attack without a probe.
-   Mutation reverts. State.rounds[N].peer_<slot>.attacks_conceded
-   logs the attack-id.
-
-3. **Mark non-codifiable + escalate to human** — if the attack
-   genuinely cannot be converted to a probe (purely qualitative
-   judgment with no grep/run/count form even after attempt), mark
-   the round's attack-id with `non_codifiable: true` AND
-   `escalation_required: true`. The mutation reverts on its branch
-   for this round; human reviews the attack post-campaign. Counter
-   cannot survive without falsifiable verification — escalation is
-   the safe-fail path, not a counter-survival path.
-
-**Forbidden in COUNTER mode**:
-- "I disagree because..." without a probe
-- "The attack misunderstands..." without a grep-able rebuttal
-- "This was already addressed" without citing line/commit + showing
-  the addressing artifact (codex round-2 catch on rule #14 trace)
-- Any argumentation that does not produce a binary
-  attack-falsified-or-mutation-reverts outcome
+**Verdict line** in counter response: `PROBE-PASS | PROBE-FAIL | CONCEDED | NON-CODIFIABLE-ESCALATED`.
 
 ### Why asymmetric
 
-PROPOSE without innovation collapses to "extend last round's path";
-PROPOSE without grounding fabricates plausible-but-fictional
-direction. COUNTER without strict verification becomes argumentation
-— the peer talks the attack down, mutation lands, but the actual
-failure mode the attack identified is unaddressed.
-
-The asymmetry is what makes adversarial collaboration deliver
-quality: be expansive when generating, be strict when defending.
-Same peer, same round, two disciplines.
+PROPOSE without innovation collapses to "extend last round". PROPOSE without grounding fabricates. COUNTER without strict verification becomes argumentation — peer talks attack down, mutation lands, identified failure mode unaddressed. Be expansive when generating, strict when defending.
 
 ### Empirical anchor
 
-A 56-round PM campaign had peer-A counter-mode arguments landing without probes; mutations passed gate without verification; mission metric stayed flat. Same campaign, peer-A's `mission_thread.candidate_routes` had ≥2 entries per round but >75% were safe-incremental restatements of prior round's mechanism. Rule #18 makes both patterns gate-fail.
+A 56-round PM campaign had counter-mode arguments landing without probes (mutations passed gate, mission metric flat) AND >75% of `candidate_routes` were safe-incremental restatements. Rule #18 makes both patterns gate-fail.
 
-### Implementation in peer prompts
+### Prompt template embedding
 
-The orchestrator's prompt template per peer call MUST embed both
-disciplines:
+Both drivers (Claude Code Agent + codex CLI subprocess) embed in peer prompts:
 
 ```
-PROPOSE: generate ≥2 candidate_routes. Each must cite ≥1 file/command/output.
-        Avoid safe-incremental phrasing unless exploration_round=true with
-        ≥1 speculative route (est_metric_delta: "unknown") justified inline.
+PROPOSE: ≥2 candidate_routes. Each cites ≥1 file/command/output.
+         Safe-incremental forbidden unless exploration_round=true with
+         ≥1 speculative route (est_metric_delta: "unknown").
 
-COUNTER: when responding to attacks on your own mutation, you may:
-        (a) convert attack to probe, run, return PASS/FAIL — preferred
-        (b) concede + revert — acceptable
-        (c) mark non_codifiable + escalation_required — last-resort
-        Argumentation without probe is FORBIDDEN. Counter-mode
-        verdict line must contain "PROBE-PASS" or "PROBE-FAIL" or
-        "CONCEDED" or "NON-CODIFIABLE-ESCALATED".
+COUNTER: respond via (a) probe + run + PASS/FAIL — preferred,
+         (b) concede + revert, OR (c) non_codifiable + escalation_required.
+         Argumentation FORBIDDEN. Verdict: PROBE-PASS | PROBE-FAIL | CONCEDED | NON-CODIFIABLE-ESCALATED.
 ```
 
-This template is included in both Claude Code Agent prompts and
-codex CLI subprocess prompts. Rule #11 nonce-header friction defense
-applies; the `verdict` field encodes which COUNTER-mode action was
-taken.
+Rule #11 nonce-header friction defense applies.
