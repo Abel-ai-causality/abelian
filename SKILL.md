@@ -80,13 +80,11 @@ argument-hint: 'abelian program.md [--peers=claude+claude|claude+codex|codex+cod
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
-# /abelian — Compound Iteration Loop
+# /abelian — Adversarial Collaboration Loop
 
-Mutate → evaluate → **adversary** → keep/revert → repeat. When done, learnings auto-persist to `docs/solutions/` for future sessions.
+Two peers each propose AND attack each other's proposals → keep/revert by goal-progress + attack-survival → mutual inspiration → repeat. Goal-met / no-proposal-after-K-frame-breaks / mutual-KILL = converge. Learnings auto-persist to `docs/solutions/` for future sessions.
 
-**v3.0 defaults:** peer challenge always on (refusing-off enforced); portfolio K=1; escalations file always written; cross-family pair (`--peers=claude+codex`) opt-in for high-stakes runs.
-
-**Why these defaults:** v1.0's self-judge mode shares the mutator's biases (acknowledged in the v1 caveat). v2.0 made the adversary structural — a separate agent whose job is to FIND WHAT BREAKS, never to "agree." v2.1 adds the cross-model option: same-family Claude adversaries break self-collapse but still share RLHF priors; Codex adversary breaks model-family collapse too. Termination is exhaustion of attacks, not consensus.
+Defaults: peer challenge always on (no off-switch); 2-peer pair (default `claude+claude` Claude Code, `codex+codex` codex CLI; `--peers=claude+codex` cross-family for high-stakes); portfolio K=1; mechanism-converge termination (no rounds/budget/wallclock cap).
 
 ## What You Need
 
@@ -125,112 +123,25 @@ Add to your program.md:
 ```markdown
 ## Takeaway
 - **Success looks like**: <observable end-state, ≤2 lines>
-- **Validated by**: <eval/metric/artifact, MUST be grep-able / runnable / countable>
+- **Validated by**: <eval/metric/artifact, grep-able / runnable / countable>
 - **Constraints**: <≤2 lines>
 ```
 
-Each field must:
-- **Success looks like** → cite a verbatim or paraphrased phrase from
-  Goal AND include the Metric `name` + `direction` keywords. Paraphrase
-  requires verbatim original cited inline.
-- **Validated by** → cite a verbatim or paraphrased phrase from Eval or
-  Metric AND be grep-able (literal pattern in named file), runnable
-  (shell command), or countable (measurable count). Aesthetic or
-  reader-experience claims are rejected (same protocol as v2.14
-  doc-task cross-attack criterion 4).
-- **Constraints** → cite ≥1 actual prohibition from program.md
-  `## Constraints` section verbatim or paraphrased.
+Quote-grep + semantic linkage (rule #16 B): Success cites Goal phrase + Metric name+direction; Validated_by cites Eval/Metric phrase + grep-able/runnable; Constraints cites ≥1 actual prohibition. Aesthetic / reader-experience claims rejected (rule #14 doc-task criterion 4). Full enforcement: rule #16 B.
 
-Quote-grep + semantic linkage (combined per codex round-2 review).
-Quote-grep alone is theatre vulnerable ("Goal: optimize speedup →
-Takeaway: speedup achieved" passes lexically, fails semantically).
+### Round-0 gate steps (full spec: rule #16)
 
-**Notably absent**: `Estimated horizon`, `Estimated cost`. v2.16 cuts
-these (codex round-1 attack 6) — they re-introduce v2.9-removed
-cap-thinking through the back door. Cost shape is printed
-informationally in step F below, not committed as program.md contract.
+1. **Hard checklist** (binary fast-fail): all program.md fields per "What You Need" + Takeaway 3 fields present.
+2. **Baseline eval**: run Eval once on unmutated tree → `round-0/eval.txt`; validate against `Metric.baseline ± Metric.tolerance`. Mismatch → refuse OR `--accept-measured-baseline` + re-confirmation.
+3. **Program-peer-challenge**: spawn dissect peer with locked attack classes `{c1, c2, c3, c4, d4}` → `round-0/program-peer-challenge.txt` with rule #11 header (`peer: program-gate`). BLOCKER → refuse; MAJOR → stderr + escalations.md.
+4. **Contract hash**: sha256 over normalized program-contract sections; stored in `state.round_0.program_contract_hash`. Per-round refresh (rule #3) recomputes; mismatch → `contract-drift-stopped` + `reconfirmation_required`. Resolution: new RUN_ID OR `--reconfirm-gate`.
+5. **Confirmation (TTY-aware)**: print Takeaway + baseline + peer-challenge verdict + contract hash + cost shape → wait stdin "go"/"no" (no timeout). Non-TTY refuses unless `--auto-launch-after-gate`.
 
-### What the gate runs
+### Migration & pre-flight
 
-1. **Hard checklist** (binary, fast-fail): all program.md fields
-   present + within v2.16 constraints (Goal has measurable noun,
-   Target paths exist or have `create:` marker, Eval shell-runnable
-   or rubric+ground, Metric has baseline+direction+tolerance, Strategy
-   ≥2 axes, Attack Classes ≥1 library, Takeaway 3 fields).
-2. **Round-0 baseline eval**: run Eval once against unmutated baseline,
-   store `$RUN_DIR/round-0/eval.txt`, validate against
-   `Metric.baseline ± Metric.tolerance`. Mismatch → refuse start OR
-   re-run with `--accept-measured-baseline` (overwrites Metric.baseline,
-   re-confirmation required).
-3. **Round-0 program-adversary**: dissect adversary (always, regardless
-   of `--adversary` flag) on program.md with locked attack classes
-   `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity,
-   c4-authority-by-citation, d4-scope-creep}` (program-contract
-   integrity classes). Writes `$RUN_DIR/round-0/program-adversary.txt`
-   with rule #11 header (`peer: program-gate`, `evidence_class:
-   theoretical`). BLOCKER → refuse start; MAJOR → stderr + escalations.md.
-4. **Program contract hash**: sha256 over normalized Goal / Task class
-   / Target / Eval / Eval ground / Metric / Constraints / Strategy /
-   Cells / Attack Classes / Takeaway. Stored in
-   `state.round_0.program_contract_hash`. Per-round refresh (rule #3
-   extension) recomputes; mismatch → `state.status =
-   "contract-drift-stopped"` + `reconfirmation_required: true`.
-   Resolution: new RUN_ID OR `--reconfirm-gate` flag.
-5. **Confirmation gate (TTY-aware)**: prints takeaway summary +
-   baseline eval + adversary verdict + cost shape (informational,
-   non-binding) + contract hash → waits stdin "go"/"no" on interactive
-   TTY, or refuses start on non-TTY without `--auto-launch-after-gate`
-   flag. No timeout (Stephen leaves runs unattended).
+`abelian program.md --migrate-takeaway` drafts Takeaway only + exits (never autostarts). Other v2.16 gaps require manual fix.
 
-Cost shape format (printed, NOT committed):
-```
-Mode: <unilateral|co-research>; chains <C>, depth <L>, candidates <M>
-Adversary: <dissect|codex|both>
-Per-round adversary calls: <C × L>
-Termination: mechanism-converge per rule #6 (no rounds/budget cap)
-```
-
-### Migration: `--migrate-takeaway`
-
-For v2.5–v2.15 program.md missing the Takeaway section:
-
-```bash
-abelian program.md --migrate-takeaway
-```
-
-Drafts a Takeaway satisfying the v2.16 schema, writes in-place edit +
-emits unified diff, then **exits without launching the loop**. User
-reviews + commits + re-runs without the flag. Migration is intentionally
-narrow (Takeaway only); other v2.16 gaps (no baseline eval, Strategy
-<2 axes, missing Eval ground) require manual fix.
-
-### Pre-flight `.gitignore` check (v2.8, retained inside round-0)
-
-Before round 1, verify `.gitignore` covers the language ecosystem's
-default build artifacts. The drift check (INVARIANTS rule #4) treats
-any dirty file outside the round's plan as drift — including untracked
-`__pycache__/` from a baseline `python3 bench.py` invocation. A missing
-pattern = `drift-stopped` on round 1, the campaign dies before landing
-a single mutation.
-
-Minimum patterns by language:
-
-| Language | Required `.gitignore` entries |
-|---|---|
-| Python   | `__pycache__/`, `*.pyc`, `.pytest_cache/`, `*.egg-info/` |
-| Node     | `node_modules/`, `.next/`, `dist/`, `.turbo/` |
-| Rust     | `target/` |
-| Go       | `vendor/` (if not committed) |
-| C/C++    | `build/`, `*.o`, `*.so`, `*.a` |
-
-Smoketest 2026-04-28 confirmed the failure mode: a Python target with no
-`.gitignore` triggered `drift-stopped` on round 1 because `bench.py`
-generated `__pycache__/slow.cpython-312.pyc`. Resolution required
-recovering the run, adding `.gitignore`, committing it, and restarting
-with a fresh `RUN_ID`. Cheaper to verify the gitignore upfront.
-
-Add the patterns and commit BEFORE the loop's first round — not as
-part of round 1 — to keep "fixture setup" out of the campaign history.
+Pre-flight `.gitignore`: ensure language build artifacts ignored before round 1 (Python `__pycache__/`, Node `node_modules/`, Rust `target/`, Go `vendor/`, C/C++ `build/` + `*.o/*.so/*.a`). Missing pattern → drift-stopped on round 1.
 
 ## Goal-Authoring Stage — INVARIANTS rule #17
 
@@ -269,267 +180,67 @@ Reads only: fuzzy mission text, `--target-hint` paths, top-3-noun keyword grep, 
 
 OKR is user-driven hierarchical decomposition (Objective → KR → Task). v3.0 is per-field adversarial cycles done by peer pair + dissect — leverages LLM enumeration + cross-attack rather than user cognitive scaffolding. Full schema, fail-out paths, and trace.json structure live in INVARIANTS rule #17.
 
-## State Persistence (v2.8) — `$RUN_DIR/state.json`
+## State Persistence — `$RUN_DIR/state.json`
 
-The loop runs across many rounds and may survive context compaction.
-`state.json` is the single source of truth for run state — not your
-memory, not the History block in `program.md`. Persist after every
-phase transition; re-read at every round step 0 (INVARIANTS rule #3).
+`state.json` is the single source of truth across context compactions; persist after every phase transition; re-read at round step 0 (rule #3). `$RUN_DIR = abelian/runs/<RUN_ID>/` (`RUN_ID` = local-time `YYYY-MM-DD-HHMM`). Per-round artifacts at `$RUN_DIR/round-N/{peer-A.txt, peer-B.txt, pre-files.txt, plan.md, eval.txt}`.
 
-`$RUN_DIR` defaults to `abelian/runs/<RUN_ID>/` where `RUN_ID` is
-local-time `YYYY-MM-DD-HHMM`. Per-round artifacts live in
-`$RUN_DIR/round-N/{adversary.txt, pre-files.txt, plan.md, eval.txt}`.
+Top-level keys:
 
-Minimal schema:
-
-```json
-{
-  "run_id": "2026-04-28-1430",
-  "status": "running",
-  "mode": "git",
-  "started_at": "2026-04-28T14:30:00-0700",
-  "branch": "feat/xyz",
-  "expected_head": "abc1234",
-  "program_path": "program.md",
-  "shape": {"chains": 1, "depth": 1, "candidates": 1, "portfolio": 1},
-  "adversary_mode": "dissect",
-  "rounds": [
-    {
-      "n": 1,
-      "cell": "memoization",
-      "status": "kept",
-      "metric_value": 2.34,
-      "verdict_line": "no attacks across all 7 classes",
-      "adversary_file": "round-1/adversary.txt",
-      "adversary_nonce": "a3f2c8e9d1b40756",
-      "adversary_started_at": "2026-04-28T14:32:18.421-0700",
-      "pre_files_file": "round-1/pre-files.txt",
-      "coresearch_degraded": false,
-      "commit": "def5678",
-      "started_at": "2026-04-28T14:31:10-0700",
-      "ended_at": "2026-04-28T14:34:55-0700"
-    }
-  ],
-  "champion": {"round": 1, "metric": 2.34, "commit": "def5678"},
-  "portfolio_cells": {"memoization": {"round": 1, "metric": 2.34}},
-  "escalations_file": "escalations.md"
-}
+```
+run_id, status, mode, started_at, branch, base_commit, expected_head, program_path,
+shape (chains/depth/candidates/portfolio), peers, frame_break_count_consecutive,
+rounds[], champion, portfolio_cells, escalations_file,
+sharpening,    // see rule #17
+round_0        // see rule #16 H
 ```
 
-Valid run `status`: `running`, `completed`, `interrupted`, `drift-stopped`, `contract-drift-stopped` (v2.16), `gate-failed-terminal`. (`cap-fired` removed in v2.9 along with the budget cap concept; runs that previously cap-fired now run till mechanism-based converge or manual interrupt.)
-- `drift-stopped` — uncommitted file outside Target (rule #4)
-- `contract-drift-stopped` (v2.16) — program.md sections in the contract-hashed set (Goal / Task class / Target / Eval / Eval ground / Metric / Constraints / Strategy / Cells / Attack Classes / Takeaway) changed after round-0 confirmation. Resolution: new RUN_ID OR `--reconfirm-gate` flag re-runs round-0 (rule #16).
+Per-round keys (within `rounds[]`): `n, cell, status, metric_value, peer_<slot>_{verdict_line, nonce, started_at, file}, mission_thread (rule #14), pre_files_file, frame_break_fired, frame_break_steps_run[], commit, started_at, ended_at`.
 
-Valid round `status`: `pending`, `mutated`, `eval-done`, `adversary-done`, `kept`, `reverted`, `gate-failed`.
+Run `status`: `running | completed | interrupted | drift-stopped (rule #4) | contract-drift-stopped (rule #16) | gate-failed-terminal`. Round `status`: `pending | mutated | eval-done | peer-done | kept | reverted | gate-failed`.
 
-Update after: every round step transition, every commit, every revert,
-status changes, eval results, post-campaign escalation review.
+`frame_break_count_consecutive` resets on any round with `metric_delta > 0` OR `blocker_status ∈ {removed, partially}`. Increments on each fired frame-break. Termination via `no-proposal-after-K-frame-breaks` checks against K (default 2).
 
-**v2.15 state schema additions**:
+## Mission Thread per round — rule #14
 
-```json
-"frame_break_count_consecutive": 0,
-"rounds": [
-  {
-    ...,
-    "mission_thread": { ... },          // see Mission Thread section
-    "frame_break_fired": false,         // did this round fire frame-break?
-    "frame_break_steps_run": []         // ["reject-pool-mining", ...]
-  }
-]
-```
+Every round populates `state.rounds[N].mission_thread` (7 fields) BEFORE commit-gate. Anchors per-round work to goal; closes the gap where `metric_delta` could be 0 round-after-round while attacks landed clean.
 
-**v2.17 state schema additions** (sharpening block, populated by rule
-#17 Adversarial Goal Sharpening before round_0 if sharpening was
-triggered):
+Mutator workflow:
 
-```json
-"sharpening": {
-  "fuzzy_mission_verbatim": "...",
-  "triage_classification": "fuzzy-but-grounded | sharp | fuzzy-ungrounded | single-axis",
-  "started_at": "...",
-  "passes": [
-    {"n": 0, "name": "triage", "files": ["pass-0/triage.md"]},
-    {"n": 1, "name": "outcome-grounding", "converged_to": "...", "files": [...]},
-    {"n": 2, "name": "metric-eval", "converged_to": "...", "files": [...]},
-    {"n": 3, "name": "lever-constraint", "converged_to": "...", "files": [...]},
-    {"n": 4, "name": "takeaway-derivation", "converged_to": "...", "files": [...]}
-  ],
-  "program_md_draft_path": "program.md",
-  "trace_json_path": "$RUN_DIR/sharpening/trace.json",
-  "recommended_flags": ["--peers=claude+claude"]
-}
-```
+1. Re-read program.md (forced — `goal_paraphrase` MUST differ from prior round).
+2. Survey prior `candidate_routes` for unpicked routes with positive est_metric_delta (reject-pool warm-start).
+3. Generate ≥2 `candidate_routes` for THIS round (mechanism + est_metric_delta + est_cost + blocker_chain).
+4. Select one + write `selection_reason` citing ≥1 unpicked route's trade-off by id.
+5. Implement (Loop steps 2-7), populate `metric_delta` + `blocker_status` from eval/outcome.
 
-**v2.16 state schema additions** (round_0 block, populated by Program
-Contract Gate before round 1):
-
-```json
-"round_0": {
-  "checklist_passed": true,
-  "checklist_failures": [],
-  "baseline_eval": {
-    "value": 0.42,
-    "file": "round-0/eval.txt",
-    "tolerance": 0.01,
-    "matches_declared": true
-  },
-  "program_adversary": {
-    "file": "round-0/program-adversary.txt",
-    "verdict": "0 BLOCKER, 1 MAJOR, 2 MINOR",
-    "evidence_class": "theoretical",
-    "blockers": 0,
-    "majors": 1,
-    "minors": 2,
-    "adversary_nonce": "...",
-    "adversary_started_at": "..."
-  },
-  "takeaway": {
-    "success_looks_like": "...",
-    "validated_by": "...",
-    "constraints": "..."
-  },
-  "program_contract_hash": "sha256:...",
-  "user_confirmed_at": "2026-05-03T15:30:00.000-0700",
-  "auto_launched": false,
-  "bypass_reason": null,
-  "reconfirmation_required": false
-}
-```
-
-`frame_break_count_consecutive` resets to 0 on any round with
-`mission_thread.metric_delta > 0` OR `mission_thread.blocker_status
-∈ {removed, partially}`. Increments by 1 on any round that fired
-frame-break. Termination via `no-proposal-after-K-frame-breaks` checks
-this counter against K (default 2).
-
-## Mission Thread per round (v2.15) — INVARIANTS rule #14
-
-Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate
-runs. Missing or incomplete = commit-gate check 8 fails. Schema:
-
-```json
-"mission_thread": {
-  "goal_paraphrase": "fresh paraphrase of program.md Goal, this round",
-  "metric_delta": 0.42,
-  "blocker_status": "removed | partially | blocked_on:<dep> | n/a",
-  "mission_relevance": "one sentence: how this round serves the mission",
-  "candidate_routes": [
-    {"id": "route-a", "mechanism": "...", "est_metric_delta": 0.5,
-     "est_cost": "cheap | medium | expensive", "blocker_chain": null},
-    {"id": "route-b", "mechanism": "...", "est_metric_delta": 0.2,
-     "est_cost": "medium", "blocker_chain": "blocker-X"}
-  ],
-  "selected_route_id": "route-a",
-  "selection_reason": "route-a est highest delta; route-b cheaper but
-                       smaller delta; route-c blocked-on integration
-                       not yet available",
-  "exploration_round": false
-}
-```
-
-Field rules and rationale: see INVARIANTS rule #14 (full schema +
-why-each-field). Key constraints commit-gate enforces (rule #2 check 8):
-
-- `candidate_routes` length ≥ 2 (single-route round = gate-fail)
-- `goal_paraphrase` ≠ `state.rounds[N-1].mission_thread.goal_paraphrase`
-  (string-equality check; identical paraphrase = mutator did not re-read
-  program.md = gate-fail)
-- `selection_reason` references at least one unpicked route by id
-  ("picked highest est delta" alone = gate-fail)
-
-Goal-progress check (rule #2 check 10): at least ONE of `metric_delta > 0`,
-`blocker_status ∈ {removed, partially}`, or `exploration_round: true`
-with `state.frame_break_count_consecutive ≤ 2`.
-
-**Mutator workflow per round**:
-
-1. Re-read program.md (forced by check 8's freshness constraint).
-2. Survey state.rounds[*].mission_thread.candidate_routes for unpicked
-   routes from prior rounds (reject-pool warm-start; mandatory in
-   Frame-break Protocol step 1, optional in normal rounds).
-3. Generate ≥2 candidate_routes for THIS round, document mechanism +
-   est_metric_delta + est_cost + blocker_chain for each.
-4. Select one, write selection_reason citing trade-offs.
-5. Implement selected route (existing Loop steps 2-7).
-6. Populate metric_delta and blocker_status from eval and round outcome
-   BEFORE commit-gate.
-
-**Why this exists**: codex 56-round trading-internal PM dogfood
-(2026-05-02) demonstrated that without a per-round goal-anchor, the
-loop produced 26 consecutive attack-clean rounds with zero mission
-metric movement. Mission Thread makes goal-relevance a structural
-per-round artifact verified by commit-gate; rounds that don't earn
-their commit by goal-progress evidence are reverted.
+Full schema + field rules: rule #14. Commit-gate: rule #2 check 8 (completeness + freshness + selection_reason trade-off cited) + check 10 (goal-progress: `metric_delta > 0` OR `blocker_status ∈ {removed, partially}` OR `exploration_round: true` with `frame_break_count_consecutive ≤ 2`).
 
 ## Search Shape (v2.4) — C × L × Candidates
 
 Default: **C=1, L=1, candidates=1** — one mutation per round, sequential. The Loop section below describes this case; most campaigns run here and should not bump these levers without cause.
 
-For harder problems, factor compute budget across three orthogonal levers:
+For harder problems, factor compute across three orthogonal levers:
 
 | Lever | What it does | Default | When to bump |
-|-------|--------------|---------|--------------|
-| **C** (chains) | Parallel approaches — each chain explores a *different axis* from Strategy. Chains run concurrently on ephemeral branches `abelian/chain-<c>/`. | 1 | Strategy lists multiple **independent, pre-identified** axes that don't need serial profile-guided discovery (e.g., speedup campaign targeting 3 CI methods — FisherZ / chisq / d_separation — each hits a different class, no cross-deps). Do NOT bump C when each next direction depends on the previous result. |
-| **L** (depth) | Sequential refinement within a chain — each step uses evaluator feedback to improve the previous step's commit. | 1 | Evaluator output is rich (cProfile breakdown, structured error messages, failing test names) AND single-shot mutations rarely hit target. Polish-pass regime. |
-| **candidates** (best-of-M) | Per-step variants — generate M candidates, pick best by **EVAL** (not adversary) before committing. Rejects are discarded, not logged per-row. | 1 | Eval is cheap (<1s) and single-sample generation variance is high (temperature-sensitive, ambiguous prompts). Cost: M× eval spend per step, 0× extra adversary. |
+|---|---|---|---|
+| `--chains=C` | Parallel approaches — each chain explores a different Strategy axis on ephemeral branches `abelian/chain-<c>/` | 1 | Strategy has ≥2 independent pre-identified axes (no cross-deps) |
+| `--depth=L` | Sequential refinement within a chain (each step uses prior eval feedback) | 1 | Eval output rich + single-shot rarely hits target |
+| `--candidates=M` | Per-step variants — generate M, pick by eval, rejects logged | 1 | Eval cheap AND single-sample variance high |
+| `--portfolio=K` | K diverse cells across rounds (MAP-Elites) — orthogonal to C/L/M | 1 | Multiple valid mechanisms worth keeping per cell |
 
-**Orthogonal to Portfolio K.** `--portfolio=K` maintains K diverse cells (MAP-Elites) ACROSS rounds; C/L/candidates shape WITHIN a round. Chains in C>1 can write into different portfolio cells if both are set.
-
-### Per-round cost shape (v2.9 — informational, not a cap)
-
-Abelian no longer requires a `--rounds` or `--budget` cap (v2.9 removed
-both — see Termination Discipline). The loop runs till converge per
-INVARIANTS rule #6. The v2.4–v2.5 budget accounting block is retained
-below as **informational** so users can sanity-check their program.md
-target before starting; the formula no longer drives a `--confirm-budget`
-gate, but is useful for setting realistic expectations on cost per round
-and total cost at typical convergence (3–10 rounds for most campaigns).
-
-```
-Per-round cost shape:
-  Shape:           chains=C, depth=L, candidates=M, portfolio=K
-  Eval runs:       C × L × M
-  Adversary calls: C × L
-  Fix-iter multiplier: ~1.5 cycles per attack (write fix → re-eval → maybe re-adversary)
-                       α (attack rate): dissect ~0.6, codex xhigh ~0.8, both ~1.0
-                       β (fix cost): ~1.5 eval+adversary units
-                       → effective per-round multiplier ~1.9× (dissect) / ~2.2× (codex) / ~2.5× (both)
-  Adversary cost: codex xhigh (latest stable) ≈ $0.5–2/call
-  Typical convergence: 3–10 rounds depending on Strategy axis count and program.md target tightness
-```
-
-**Empirical from P0 audit campaign 2026-04-26**: raw formula under-estimated 2–12× when fix-iter cycles weren't counted; v2.5 multiplier accounts for this. If you're cost-sensitive, run a single dry-round first to calibrate before letting the till-converge loop proceed unattended.
-
-### Parallel expansion semantics (C>1 or L>1 or candidates>1)
-
-- **C chains in parallel** (per round): each chain runs The Loop's steps 1-5 independently on `abelian/chain-<c>/` branch. After all C chains complete step 5, "Place" picks the best chain's commit as new champion; others go to portfolio cells (if K>1) or revert.
-- **L depth per chain** (per chain): steps 1-5 repeat L times sequentially within a chain. Each step refines on the previous step's commit using evaluator feedback from that commit. Adversary runs once per step. A revert at any step terminates that chain (don't keep refining a broken trunk).
-- **Candidates M per step** (inside step 1): Hypothesize generates M testable variants. Each is mutated + evaluated separately (no adversary yet). Best-eval variant is chosen; ONLY that variant gets adversary + Confirm + Place. Rejected variants logged as summary line, not full rows.
+Per-round cost: `Eval runs = C×L×M`, peer-challenge calls = `C×L×2` (2 peers each round). Fix-iter multiplier ~1.5×. Typical convergence 3-10 rounds.
 
 ### Invocation
 
 ```
-/abelian program.md \
-  --peers=claude+claude    # default (Claude Code) or codex+codex (Codex CLI)
-                           # cross-family: claude+codex (high stakes)
-  --chains=C               # default 1
-  --depth=L                # default 1
-  --candidates=M           # default 1
-  --portfolio=K            # default 1 (single champion)
-  --code-review=on         # optional, rule #12 supplemental code-quality gate
+abelian program.md \
+  [--peers=claude+claude|claude+codex|codex+codex] \
+  [--chains=C] [--depth=L] [--candidates=M] [--portfolio=K] \
+  [--code-review=on]
 
-# Fuzzy mission entrypoint (v3.0):
-/abelian --mission "<fuzzy text>" [--target-hint <paths>] [--interactive-sharpening]
+abelian --mission "<fuzzy text>" [--target-hint <paths>] [--interactive-sharpening]
 ```
 
-**No `--rounds` / `--budget` flag**. Abelian runs **till converge** per
-INVARIANTS rule #6 (v2.15: goal-met / no-proposal-after-K-frame-breaks /
-mutual-KILL). `adversary-exhausted` and metric-only `plateau` are NOT
-standalone termination conditions in v2.15 — they trigger Frame-break
-Protocol (see "Frame-break Protocol" section) instead of stopping the
-loop. Manual abort: send SIGINT (Ctrl+C) → `status=interrupted` +
-handoff. See "Termination Discipline" below for the rationale.
+No `--rounds`, `--budget`, or wallclock flags — mechanism-converge per rule #6. Manual abort: SIGINT.
 
 ## The Loop
 
@@ -540,95 +251,20 @@ For each round:
 2. **Mutate** — apply the change (minimal, one idea per round). Before writing, snapshot pre-files: `mkdir -p $RUN_DIR/round-N && { git ls-files -z; git ls-files -z --others --exclude-standard; } | sort -zu > $RUN_DIR/round-N/pre-files.txt`. INVARIANTS rule #5.
 3. **Evaluate** — run eval command, or self-judge against frozen rubric. Write metric value to `$RUN_DIR/round-N/eval.txt` and update `state.rounds[N].metric_value`.
 4. **Peer challenge** — spawn one peer subagent per configured peer (default 2: peer-A + peer-B), each running `prompts/dissect.md inlined` (Claude) or `codex exec` (codex CLI) on the diff + eval output. Each peer MUST write its full attack list (or `n/a-this-target` per class) to `$RUN_DIR/round-N/peer-<slot>.txt` BEFORE returning. Each peer's verdict line MUST be recorded in `state.rounds[N].peer_<slot>_verdict_line`. INVARIANTS rules #1, #7, #18. (See Peer Challenge section.)
-5. **Confirm** — no attacks: run commit-gate (INVARIANTS rule #2, **10 always-on checks + 1 conditional**, v2.15):
-   1–7: `adversary.txt` non-empty + header block nonce matches `state.adversary_nonce` + mtime in `(adversary_started_at, now)` + verdict_line `grep -qF` in body + drift check + `pre-files.txt` exists + eval value matches state.
-   **8 (v2.15, rule #14)**: `state.rounds[N].mission_thread` complete (7 fields populated, ≥2 candidate_routes, goal_paraphrase ≠ prior round's, selection_reason references at least one unpicked route).
-   **9 (rule #15)**: each peer-N header `evidence_class:` field present and in whitelist (`theoretical | paper | replay | settled | dry_run | live`).
-   **10 (v2.15, rule #14)**: goal-progress required — `mission_thread.metric_delta > 0` OR `blocker_status ∈ {removed, partially}` OR (`exploration_round=true` AND `state.frame_break_count_consecutive ≤ 2`). Pure attack-survival with `metric_delta=0 AND blocker=n/a AND exploration=false` is gate-fail.
-   **11 (conditional, rule #12)**: when `--code-review=on`, run `codex review --uncommitted -c 'model_reasoning_effort="high"'` → `codex-review.txt` non-empty AND no `[P1]`/`[P2]` markers.
-   All checks pass → `git commit`. Any fail → revert (`git checkout` + scoped clean of new files via pre/post diff), mark round `gate-failed`. With attacks: convert each to a verification (regression test, worst-case benchmark input, or added rubric criterion) and re-eval. Any verification fails → revert. Black-box eval with no augmentation surface: log attack as `provisional-flag`, keep but mark.
+5. **Confirm** — run commit-gate (rule #2, 10 always-on + 1 conditional). Always-on: peer-{A,B}.txt non-empty + nonce match + mtime + verdict in body (1-4) + drift + pre-files + eval match (5-7) + mission_thread complete & fresh (8) + evidence_class enum (9) + goal-progress required (10). Conditional: codex-review clean of P1/P2 when `--code-review=on` (11). Pass → `git commit`. Fail → revert. Attacks (rule #18 COUNTER) convert to probes; probe-fail → revert.
 6. **Place** — K=1 mode: replace champion if better, else revert. K>1 mode: replace THIS cell's incumbent only if it beats that cell's score. New cell label → seed that cell.
 7. **Record** — append to History: kept/reverted/error, cell, adversary-result, metric delta.
 8. **Adapt** — 5 consecutive reverts → shift strategy. 5 rounds with no new cell filled (K>1) → write to `escalations.md`. All directions exhausted → stop early.
 
-## Peer Challenge (v3.0; was "Adversary" in v2.x)
+## Peer Challenge
 
-**v3.0 reframe**: in v3.0, every peer in the configured pair (default 2)
-operates as both a proposer AND a challenger. There is no separate
-"adversary" role — each peer challenges the other. Section retains
-some v2.x "adversary" wording where it refers to the structural
-discipline (file-gate, nonce, attack-class checklist) rather than a
-distinct role.
+Peer subagent receives a prompt with verbatim `program.md` Goal/Target/Constraints/Attack-Classes + fresh nonce + ISO timestamp + `prompts/dissect.md` inlined → writes attack list to `peer-<slot>.txt` with rule #11 header → returns verdict line. Both drivers identical mechanism: Claude Code uses `Agent(general-purpose)`, codex CLI uses `codex exec - -s workspace-write` subprocess.
 
-**Driver-neutral protocol**: a fresh peer subagent receives a prompt that includes verbatim `program.md` Goal/Target/Constraints/Attack-Classes + a fresh nonce + ISO timestamp, executes in isolated context with its own tool access (Read/Bash/Write or equivalent), writes the attack list to `$RUN_DIR/round-N/peer-<slot>.txt` with a mandatory `ABELIAN-PEER-v1` header (rule #11), and returns the verdict line. Two reference dispatches:
-
-- **Claude Code primary**: `Agent(general-purpose)` running `prompts/dissect.md inlined` — see [`drivers/claude-code/README.md`](drivers/claude-code/README.md). This is the default for `/abelian program.md` invocation in a Claude Code session. Adversary subagent is a Claude with same RLHF family as the mutator — structural role split, weak prior split.
-- **Codex CLI primary**: `codex exec - -s workspace-write` subprocess + the [`prompts/dissect.md`](prompts/dissect.md) template — see [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md). Self×self default (codex × codex with different prompt context per role at full max-effort). No wrapper script — codex CLI is itself an LLM agent harness consuming SKILL.md directly, the same way Claude Code does.
-
-Both drivers honor the same protocol and INVARIANTS. The descriptions below use Claude Code idiom (Agent / Skill / MCP) because abelian's original implementation was Claude Code. Codex CLI users substitute `codex exec` for `Agent(...)` and `prompts/dissect.md` content for `prompts/dissect.md inlined`. Mechanism, header, gate, and INVARIANTS are byte-for-byte identical.
-
-Peer pair via `--peers=<config>`:
-
-| Value | Pair | Prior separation | Cost | When to use |
-|-------|------|------------------|------|-------------|
-| `claude+claude` (Claude Code default) | Two Claude subagents with `prompts/dissect.md inlined`, different context-framing per peer | Weak (same RLHF family, but different framing) | 2× | Most cases, zero-config, portable |
-| `codex+codex` (Codex CLI default) | Two codex exec subprocesses with `prompts/dissect.md`, different framing per peer | Weak (same family, different framing) | 2× | Codex-CLI-native runs |
-| `claude+codex` | Cross-family pair (one peer Claude, one peer codex via subprocess; codex CLI required + auth'd) | Strong (cross model family) | 2× (higher per-call) | High stakes, self-judge eval, key decisions |
-
-For 3-peer / N-peer topologies (e.g., adding codex as third reviewer): use `--code-review=on` (rule #12 supplemental gate) or wait for v4.0 N-peer architecture. v3.0 default is 2-peer.
-
-`--adversary=off` (v2.x) is REFUSED in v3.0 — abelian without peer challenge is not abelian.
-
-**File-gated output.** Each peer subagent MUST write its full attack list (or empty list with explicit `n/a-this-target` per attack class) to `$RUN_DIR/round-N/peer-<slot>.txt` BEFORE returning. Conversation-only return = invalid, fails commit-gate. The agent prompt MUST quote `program.md` Goal/Target/Constraints/Attack-Classes verbatim — paraphrasing forbidden. INVARIANTS rules #1, #7.
-
-**Header-block protocol (v2.8 anti-fabrication, v3.0 PEER-v1 rename).** Before each peer challenge call, the orchestrator generates a fresh `nonce` (16 hex via `secrets.token_hex(8)`) and `started_at` (ISO ms) and writes both into `state.rounds[N].{peer_<slot>_nonce, peer_<slot>_started_at}`. The prompt instructs the subagent to write a mandatory header block (`ABELIAN-PEER-v1` + run_id + round + peer + nonce + started_at + verdict, then `---`, then attacks) as the first lines of the output file. Commit-gate verifies nonce match + mtime in valid range + verdict in body. INVARIANTS rule #11. This is friction-level defense (not cryptographic) targeting Threat-1: post-compaction "forgot to call peer" silent fabrication. An orchestrator must now cat state.json to find the nonce, which triggers cat INVARIANTS, which surfaces "must actually call peer."
-
-**Peer's challenge job (v3.0)**: under one-loop discipline, every configured peer both proposes mutations AND attacks the other peer's mutations (rule #18 asymmetric discipline: innovative+grounded when proposing, strictly verification-oriented when countering). When a peer is in the CHALLENGE phase of a round (attacking the other peer's mutation), it may also write an informational `alternative_routes:` section at end of attacks (after `---`-delimited attack content). Alternative routes are **non-binding** (commit-gate ignores their content; rule #11 header-block validation does not extend to this section), but **readable** by the next round's peers when generating `mission_thread.candidate_routes` (rule #14 reject-pool mining + Frame-break Protocol step 5). Schema per rule #11 (each entry has `id`, `mechanism`, `est_metric_delta`, `rationale`).
-
-**v3.0 unification of v2.x role distinctions**: in v2.0-v2.14 the "adversary" was a separate role (attack-only, no propose). v2.15 partially relaxed for co-research mode (allowing informational alternative_routes). v3.0 collapses the role distinction entirely — every peer challenges every other peer; rule #18 governs the propose/counter discipline asymmetry. The v2.0 line-273 ban ("adversary cannot endorse, only attack") is replaced by rule #18: in COUNTER mode, peer must be strictly verification-oriented (probe-or-revert-or-escalate); argumentation forbidden. This is the structural mechanism behind "adversarial collaboration" — every party propose+attack, with asymmetric discipline per phase.
-
-**Code Review supplemental layer (`--code-review=on`)**: orthogonal to the adversary call above, abelian can run codex CLI's purpose-built `codex review --uncommitted` as an additional gate before commit (INVARIANTS rule #12). This is a code-quality layer using codex's built-in P1/P2/P3 severity schema — different from rule #1's domain-specific attack-class adversary. Output to `round-N/codex-review.txt` (no header block — rule #11 does not apply to this file). Commit-gate adds the conditional check (rule #2 check 11) when enabled: no `[P1]`/`[P2]` markers in codex-review.txt. Use for ship-prep, PR-level decisions, security-sensitive mutations. Default off because cost roughly doubles per round.
-
-**Graceful degradation (loud, never silent):**
-- `--peers=claude+codex` + codex CLI unavailable (binary missing OR `~/.codex/auth.json` absent OR codex MCP wrapper not configured) → degrade to `claude+claude` (same-family with different framing), **write notice in 3 places**: console (stderr), `abelian/escalations.md`, and History row for the affected rounds. Continue loop.
-- Degradation decision is made **once at loop start** — don't re-check codex every round (noise + unpredictable runs).
-- The notice must include the why: "codex CLI not reachable (run `codex login` and verify `codex exec --version`); cross-family pair disabled; runs are weaker on prior diversity for this session."
-- `--code-review=on` + codex CLI unavailable → skip rule #12 only (don't fail loop), 3-place notice (per rule #12 graceful degradation). Continue loop.
-
-**Honest limit:** Default `claude+claude` (or `codex+codex` on codex CLI) with different framing breaks structural self-collapse but does NOT break model-family collapse. Two Claudes with different framing still share RLHF priors. For high-stakes decisions, `--peers=claude+codex` is the cross-family upgrade.
-
-**Termination**: peer-challenge-exhausted is an informational signal that triggers Frame-break Protocol; only `no-proposal-after-K-frame-breaks` (after 5-step creative escape fails) terminates on exhaustion. Conditions per rule #6: `goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | user-interrupt`.
-
-**Two peers, both propose AND attack**: unilateral attack-only is
-itself a collapse vector when the work involves discovery, not just
-verification. Stephen 2026-04-26: "竞争合作最重要——两边要都互相 challenge
-和互相启发，不然会坍缩，要 goal driven." When generator only proposes and
-adversary only attacks, two failure modes:
-- Adversary collapses to "all-KILL" (no path forward — see polymarket Codex
-  topping at +3.6% sharpe in adversarial mode vs 20%+ in collaborative)
-- Generator collapses to RLHF prior (no fresh attack frame inspires it)
-
-v3.0 unifies on this: both peers always do BOTH propose AND challenge,
-with goal-driven termination + rule #18 asymmetric discipline (innovative
-+ grounded when proposing, strictly verification-oriented when countering).
-See "Co-Research Mode" section below.
-
-## Peer Loop (v3.0)
-
-Two peers (default). Each round:
-
-1. **Parallel propose** — peer-A + peer-B each generate one mutation, different angles. Strategy-axis split + per-peer context-framing forces divergence. Output: `peer-A/round-N/`, `peer-B/round-N/`.
-2. **Parallel implement** — each on its own branch.
-3. **Eval both** — execution gate + metric ratchet on each.
-4. **Cross-attack** — peer-A attacks peer-B's mutation; peer-B attacks peer-A's. Both write `peer-{A,B}.txt` with `ABELIAN-PEER-v1` header (rule #11) using `prompts/dissect.md` template. Rule #18 governs propose-vs-counter discipline.
-5. **Verify** — each attack converts to a probe (rule #18 COUNTER mode); probe fail → mutation reverts on its branch.
-6. **Champion** — best surviving metric wins. Loser preserved for inspiration.
-7. **Mutual inspiration** — each peer reads other's mutation + attacks; feeds R+1.
-8. **Converge** — rule #6 termination conditions; "stuck" → Frame-break Protocol.
+Each peer's CHALLENGE phase (rule #18 COUNTER mode) may also write an informational `alternative_routes:` section after attacks — non-binding but mineable by next round's `mission_thread.candidate_routes` (rule #14 reject-pool / Frame-break step 5).
 
 ### Pair configuration
 
-`--peers=<A>+<B>` — diversity comes from DIFFERENT CONTEXT FRAMING per peer at SAME max-effort tier. Don't downgrade one peer.
+`--peers=<A>+<B>` selects the peer-tool pair. Diversity comes from DIFFERENT CONTEXT FRAMING per peer at SAME max-effort tier (don't downgrade one peer).
 
 | Pair | Diversity source | When |
 |---|---|---|
@@ -650,189 +286,38 @@ Applies to: SKILL.md / program.md / design docs / proposals / decision recs / re
 
 2× per round vs single-peer review. Mitigated by ~1.5× fewer rounds on non-trivial work via mutual inspiration → ~33% net overhead.
 
-## Frame-break Protocol (v2.15) — creative escape, not termination
+## Frame-break Protocol — creative escape, not termination
 
-When a round looks "stuck" — adversary returns no attacks, OR
-metric_delta is ≤ 0, OR all candidate_routes have est_metric_delta ≤
-0 — v2.14 would have called this plateau or adversary-exhausted and
-terminated the loop. v2.15 instead treats stuck-ness as the **exact
-moment LLM creative capacity should fire**, not the moment to give
-up. The loop runs Frame-break Protocol BEFORE any termination claim.
+Plateau in a goal-driven co-research loop is when LLM creative capacity should fire, not when the loop should quit. Frame-break runs BEFORE any termination claim.
 
-### Trigger conditions
+### Trigger
 
-Frame-break fires (sets `state.rounds[N].frame_break_fired = true` and
-increments `state.frame_break_count_consecutive`) when ANY of:
+Fires (sets `frame_break_fired=true`, increments `frame_break_count_consecutive`) when ANY of:
+1. Both peers' verdicts = no attacks (challenge-exhausted, single round)
+2. `metric_delta ≤ 0` AND `blocker_status ∉ {removed, partially}`
+3. All `candidate_routes` have `est_metric_delta ≤ 0` (or all `"unknown"` outside an exploration chain ≤ 2)
 
-1. Adversary verdict is `no-attacks` for the round (proxy for
-   adversary-exhausted, single round)
-2. `mission_thread.metric_delta ≤ 0` AND `blocker_status ∉ {removed,
-   partially}`
-3. All entries in `mission_thread.candidate_routes` have
-   `est_metric_delta ≤ 0` (or all marked `unknown` outside an
-   exploration-round chain ≤ 2)
+Resets `frame_break_count_consecutive = 0` on any round with `metric_delta > 0` OR `blocker_status ∈ {removed, partially}`.
 
-Resetting: `frame_break_count_consecutive = 0` whenever a subsequent
-round produces `metric_delta > 0` OR `blocker_status ∈ {removed,
-partially}`. The counter measures *consecutive* exhaustion only.
+### 5 mandatory steps (in order)
 
-### The 5 mandatory steps (in order, all must run before declaring no-proposal)
+| # | Step | Action | Records in `frame_break_steps_run` |
+|---|---|---|---|
+| 1 | Reject-pool mining | Scan `state.rounds[*].mission_thread.candidate_routes`; promote top-3 unselected `est_metric_delta > 0` routes to current round (dedupe by mechanism) | source rounds |
+| 2 | Attack-class library escalation | Load 1 additional library (cross-domain to Task class); fresh peer challenge with expanded classes → `round-N/peer-frame-break.txt` (rule #11 nonce header) | added library + new attacks count |
+| 3 | Peer framing swap | Swap peers' context-framing for next round (optimist↔auditor; top-down↔bottom-up; Strategy axes 1,3,5↔2,4,6; smallest-fix↔robust-fix) | new framing pair |
+| 4 | Goal re-paraphrase from current state | Mutator writes fresh `goal_paraphrase` based on current metric vs target gap; allow ≤2 speculative routes (`est_metric_delta: "unknown"`) bounded by `frame_break_count_consecutive ≤ 2` | re-paraphrased goal + speculative routes |
+| 5 | Cross-peer alternative_routes mining | Promote each peer's informational `alternative_routes` (with `est_metric_delta > 0`) into the OTHER peer's next-round `candidate_routes` | promoted routes |
 
-When triggered, BEFORE the round's final state is written and BEFORE
-considering termination, the mutator MUST execute:
+**Step 4 abort to round-0 instead of in-frame re-paraphrase** when contract invalidity surfaces (rule #16 I): metric_delta direction inverts (≥ `Metric.tolerance`); `Takeaway.Validated_by` stops being grep-able/runnable; program-contract hash mismatch. Sets `state.round_0.reconfirmation_required = true`. Resume via `--reconfirm-gate`.
 
-**Step 1 — Reject-pool mining**
+### Termination via `no-proposal-after-K-frame-breaks`
 
-Scan `state.rounds[*].mission_thread.candidate_routes` (all prior rounds,
-all peers in co-research). Surface the top-3 unselected routes ranked by
-`est_metric_delta > 0`. Promote them to the current round's
-`candidate_routes` (de-duped against existing entries by mechanism
-similarity). Record in `state.rounds[N].frame_break_steps_run` with
-the source rounds.
-
-Why: best-of-M historically discarded M-1 with no inheritance. Frame-break
-treats the discard pool as warm-start fuel.
-
-**Step 2 — Attack-class library escalation**
-
-Load 1 additional attack-class library not currently in program.md
-Attack Classes from abelian's library set (default-7, doc-class,
-research-class, audit-class, decision-class, code-domain extensions —
-whichever is most cross-domain to the current Task class). Re-spawn
-the adversary with the expanded class list and an explicit "find
-attacks the prior frame missed because it didn't have these classes"
-prompt. Write to `$RUN_DIR/round-N/adversary-frame-break.txt` with
-its own nonce header (rule #11 applies).
-
-Why: codex 2026-04-26 P0 audit dogfood — dissect declared exhausted
-but missed `subprocess command injection` because the class wasn't in
-its frame. Frame-break expands the frame.
-
-**Step 3 — Peer framing swap (co-research mode only)**
-
-Swap peer-A's and peer-B's context-framing for the next round's
-proposal step. Examples:
-- A=optimist/B=auditor → B=optimist/A=auditor
-- A reads Strategy axes 1,3,5 → reads 2,4,6 next round
-- A starts top-down → starts bottom-up
-- A "smallest fix" → "most robust fix"
-
-If unilateral mode, skip this step (no peer to swap with), record
-`step-3: skipped (unilateral)` in `frame_break_steps_run`.
-
-Why: same context-framing two rounds in a row produces same RLHF prior
-output. Forced swap surfaces the framing-locality of the stuck-ness.
-
-**Step 4 — Goal re-paraphrase from current state**
-
-Re-read program.md Goal verbatim, then prompt mutator to write a fresh
-`goal_paraphrase` for next round based on "where we currently are vs
-the goal" rather than re-hashing the original framing. The paraphrase
-MUST cite the current metric value and the gap to target. Allow up to
-N=2 speculative routes (`est_metric_delta: "unknown"`) to seed
-exploration; this exploration window is bounded by the
-`exploration_round=true` constraint and `frame_break_count_consecutive
-≤ 2` guard in commit-gate check 10.
-
-Why: original program.md framing may be exhausted but a re-paraphrase
-from current state surfaces unknown-unknown directions. The bounded
-exploration window prevents the loop from becoming pure exploration.
-
-**v2.16 — abort-to-round-0 conditions**: step 4 distinguishes two
-outcomes (rule #16 boundary):
-
-- **In-frame re-paraphrase** (default): Takeaway and program-contract
-  hash still valid; mutator generates fresh paraphrase from current
-  metric vs target gap; loop continues normally with bounded
-  exploration.
-- **Contract invalidity surfaces** → abort to round-0 with
-  `state.round_0.reconfirmation_required = true`:
-  - `metric_delta` direction inverts mid-run (sign change with absolute
-    value ≥ `Metric.tolerance`) — metric no longer measures the goal
-    as Takeaway claimed.
-  - `Takeaway.Validated_by` stops being grep-able / runnable (e.g.,
-    cited file deleted, cited shell command missing).
-  - Program-contract hash mismatch surfaces during refresh.
-
-Aborting to round-0 is the correct response to contract invalidity:
-the LLM cannot creatively escape a broken contract; only the human
-can re-confirm. Resume after re-confirmation via `--reconfirm-gate`.
-
-**Step 5 — Cross-peer alternative_routes mining (co-research mode only)**
-
-For each peer, read the OTHER peer's most recent `peer-X.txt`
-informational `alternative_routes:` section (line 273 partial
-relaxation product). Promote any route with `est_metric_delta > 0`
-to the next round's `mission_thread.candidate_routes` for THIS peer.
-Record in `frame_break_steps_run`.
-
-If unilateral mode, skip (no peer to mine), record `step-5: skipped
-(unilateral)` in `frame_break_steps_run`.
-
-Why: bonus prompt edit to line 273 lets co-research adversary suggest
-informational routes; without a mining step, that signal would be
-unused. Frame-break makes it consumed.
-
-### Termination via no-proposal-after-K-frame-breaks
-
-Only after ALL applicable steps run (steps 1, 2, 4 always; steps 3 and
-5 in co-research mode) AND the resulting `mission_thread.candidate_routes`
-for the next round contains zero entries with `est_metric_delta > 0`
-AND this state has held for `frame_break_count_consecutive ≥ K`
-(default K=2) → terminate with `status=completed`,
-`termination.condition = "no-proposal-after-K-frame-breaks"`.
-
-This is the v2.15 "creative exhaustion" termination. It is materially
-stricter than v2.14's `adversary-exhausted` because it requires the LLM
-to have demonstrably tried 5 forms of frame-breaking and still found
-nothing. K=2 (consecutive) means the loop must have failed to escape
-on at least 2 different rounds with full frame-break sequences before
-giving up.
-
-### Why not just "stop on plateau"
-
-Stopping on plateau = telling the LLM "your creative capacity is
-bounded by the current frame's vocabulary." Frame-break encodes the
-opposite: "your creative capacity is precisely for breaking frames;
-plateau is when you should fire it, not when you should give up."
-
-Plateau-as-termination was a v1.x adversarial-loop inheritance: in
-optimization, plateau is gradient-zero, stop. In adversarial, plateau
-is no-attack-lands, stop. In **goal-driven co-research**, plateau is
-"current frame's candidate pool exhausted, time to escape frame." The
-escape mechanism is the 5-step protocol; only when the LLM has tried
-all 5 and can produce no positive-EV route is exhaustion real.
+Fires when ALL applicable steps run AND next-round `candidate_routes` contains zero entries with `est_metric_delta > 0` AND `frame_break_count_consecutive ≥ K` (default K=2). Materially stricter than challenge-exhaustion alone — requires 2 separate frame-break rounds across all 5 steps to have failed to surface positive-EV next steps.
 
 ### Cost
 
-Frame-break adds ~1× round cost when fired (one extra adversary call
-in step 2, no extra eval). With K=2 default, the worst-case overhead
-above v2.14 termination is ~2 extra rounds × ~1× round = ~2 round-equivalents
-before terminate. In return, the loop catches "we're stuck within the
-frame, what other frames are there?" — the exact failure mode codex's
-56-round PM dogfood demonstrated v2.14 could not catch.
-
-### State.json frame-break trace
-
-```json
-"frame_break_count_consecutive": 1,
-"rounds": [
-  ...,
-  {
-    "n": 27,
-    "frame_break_fired": true,
-    "frame_break_steps_run": [
-      "step-1: mined 2 routes from rounds 12, 19",
-      "step-2: escalated to research-class library, found 1 new attack",
-      "step-3: skipped (unilateral)",
-      "step-4: re-paraphrased goal from current metric (0.42 vs target 0.8)",
-      "step-5: skipped (unilateral)"
-    ],
-    "mission_thread": { ... },
-    "verdict_line": "1 attack found via library escalation"
-  }
-]
-```
+~1× round when fired (one extra peer challenge call in step 2, no extra eval). K=2 worst-case = ~2 round-equivalents before terminate. Catches "stuck within frame, what other frames exist?" — the failure mode v2.14 could not catch.
 
 ## Attack Class Checklist (v2.5)
 
@@ -873,80 +358,56 @@ as a list:
 - liquidity-cliff         # custom domain-specific
 ```
 
-**Migration**: existing program.md Attack Classes sections written under
-v2.5 syntax (bullet list of strings) remain valid and are treated as
-`[default] + <listed bullets>`. Library names are new identifiers; the
-list-of-strings grammar is unchanged.
+Library opt-in mandatory for non-code tasks (`task != code` AND no library listed → refuse start). `*-class` suffix RESERVED for libraries (custom extensions use `<domain>-custom` etc.).
 
-**Namespace discipline** (NEW v2.14): the four library identifiers
-(`research-class`, `audit-class`, `decision-class`, `doc-class`) and any
-future `*-class` suffix are RESERVED. Custom domain-specific extensions
-must NOT use the `*-class` suffix (collision risk: a v2.5 program.md that
-named a custom extension `audit-class` for an unrelated auditing concern
-now ambiguously triggers v2.14's audit-class library mandate). On v2.14
-migration, rename custom-class collisions to `<domain>-custom`,
-`<domain>-extension`, or another scheme. Loop refuses to start when a
-custom name in Attack Classes matches a reserved library identifier
-unless explicit `--accept-reserved-name-collision` flag passed.
+#### research-class (empirical investigation / data analysis)
 
-#### research-class (6 classes, for empirical investigation / data analysis)
-
-| # | Class | What to probe |
+| # | Class | Probe |
 |---|---|---|
-| R1 | **selection-bias** | sample selection process, survivorship effects, any filter that conditions on the outcome variable |
-| R2 | **overfit** | in-sample tuning vs out-of-sample test, hyperparameter search degrees of freedom, multiple-comparisons inflation |
-| R3 | **regime-shift** | training distribution vs deployment distribution, structural breaks, non-stationarity |
-| R4 | **look-ahead** | future information leaking into past features, temporal join correctness, t+1 features used at t |
-| R5 | **target-leakage** | target's own derivative used as a feature (proxy variable), train/val contamination via shared keys |
-| R6 | **replication-failure** | does the result hold on independent data / different seed / different operationalization, or sample-specific |
+| R1 | selection-bias | sample selection conditioning on outcome |
+| R2 | overfit | in-sample tune vs out-of-sample test |
+| R3 | regime-shift | train distribution vs deploy distribution |
+| R4 | look-ahead | future info leaking into past features |
+| R5 | target-leakage | target derivative as feature; train/val contamination |
+| R6 | replication-failure | does result hold on independent data / seed / op |
 
-#### audit-class (4 classes, for review / verification of prior claims)
+#### audit-class (review / verification of prior claims)
 
-| # | Class | What to probe |
+| # | Class | Probe |
 |---|---|---|
-| A1 | **confirmation-bias** | did the analyst frame queries to find evidence FOR a held belief? what alternative would have falsified the conclusion |
-| A2 | **motivated-reasoning** | does the analyst have stake in the outcome? are negatives soft-pedaled |
-| A3 | **cherry-pick** | reported subset vs underlying population — was anything excluded without justification |
-| A4 | **strawman** | does the prior claim being audited match what the original author actually wrote (verbatim grep), or a softer version |
+| A1 | confirmation-bias | did analyst frame queries to find evidence FOR held belief |
+| A2 | motivated-reasoning | analyst stake in outcome; negatives soft-pedaled |
+| A3 | cherry-pick | reported subset vs population; unjustified exclusion |
+| A4 | strawman | claim matches what original author wrote (verbatim) |
 
-#### decision-class (4 classes, for high-stakes choice under uncertainty)
+#### decision-class (high-stakes choice under uncertainty)
 
-| # | Class | What to probe |
+| # | Class | Probe |
 |---|---|---|
-| D1 | **sunk-cost** | does the recommendation justify keeping prior commitment because of past investment alone |
-| D2 | **loss-aversion** | is the recommendation systematically conservative because losses loom larger than gains, asymmetrically with the actual payoff distribution |
-| D3 | **availability-heuristic** | is the example set memory-of-recent-events vs base-rate-representative |
-| D4 | **scope-creep** | does the proposed action stretch beyond the stated decision boundary (e.g., "fix bug" turns into "redesign module") |
+| D1 | sunk-cost | recommendation keeps commitment due to past investment alone |
+| D2 | loss-aversion | systematically conservative vs actual payoff distribution |
+| D3 | availability-heuristic | example set is recent-memory vs base-rate-representative |
+| D4 | scope-creep | action stretches beyond stated decision boundary |
 
-#### doc-class (4 classes, for prose / spec / proposal documents)
+#### doc-class (prose / spec / proposal)
 
-| # | Class | What to probe |
+| # | Class | Probe |
 |---|---|---|
-| C1 | **scope-drift** | does the doc's claim/proposal exceed what the Goal section authorized — added requirements, larger surface, broader audience |
-| C2 | **hidden-assumption** | what unstated **logical/conceptual** premise must hold for the doc's conclusion to be true; cite the line where the assumption hides. Distinct from default class #5 layout-sensitive (which covers physical/encoding/format premises). When doc contains code samples, BOTH must be probed. |
-| C3 | **definition-elasticity** | does a term shift meaning between sections (e.g., "user" = end-user in §1, = developer in §3) — break the chain |
-| C4 | **authority-by-citation** | a claim is supported by citing X without checking X actually says it; or appeal to "best practice" without source |
+| C1 | scope-drift | claim/proposal exceeds Goal section authority |
+| C2 | hidden-assumption | unstated logical premise required for conclusion (cite line) |
+| C3 | definition-elasticity | term shifts meaning between sections |
+| C4 | authority-by-citation | claim cites X without verifying X says it |
 
-#### Code-domain extensions (existing, unchanged)
+#### Code-domain extensions
 
-- **Code-speedup campaigns**: `bit-identity-vs-baseline`, `override-hook-preservation`, `cache-key-completeness`, `cache-eviction-bounded`
-- **API service campaigns**: `subprocess command injection`, `path traversal beyond suffix check`, `symlink escape from sandbox dir`
-- **Data pipeline campaigns**: `schema drift`, `null/missing-value handling`, `unicode normalization`, `timezone semantics`
-- **ML training campaigns**: prefer **research-class** (R1–R6 covers train/val contamination, regime mismatch, target leakage); add domain extensions on top as needed
+- Speedup: `bit-identity-vs-baseline`, `override-hook-preservation`, `cache-key-completeness`, `cache-eviction-bounded`
+- API service: `subprocess command injection`, `path traversal beyond suffix check`, `symlink escape from sandbox dir`
+- Data pipeline: `schema drift`, `null/missing-value handling`, `unicode normalization`, `timezone semantics`
+- ML training: prefer research-class (R1-R6); add extensions on top
 
-**Library opt-in is mandatory for non-code tasks.** The `task:` field in
-program.md (see "What You Need" above) declares task class. Loop refuses
-to start when `task != code` AND Attack Classes does not list at least
-one non-default library. Existing v2.5 program.md without `task:` field
-defaults to `task: code` — backwards-compat — but emits a loud warning
-(see "What You Need").
+### Peer prompt requirement
 
-### Adversary prompt requirement (loop enforces)
-The Agent prompt for each round MUST include:
-> Address EACH attack class below. For each: either provide a specific attack, or explicitly mark `n/a-this-target` with one-sentence reason. Round is incomplete if any class is unaddressed.
-> Classes: [list from program.md]
-
-If adversary returns without addressing all classes → loop re-spawns with explicit "missing class X" reminder. After 2 re-spawn failures on same class → escalate (write to escalations.md).
+Each peer prompt MUST include: "Address EACH attack class below; either specific attack OR `n/a-this-target` with grep-able trace. Round incomplete if any class unaddressed." After 2 re-spawn failures on same class → escalate to escalations.md.
 
 ## Eval Discipline
 
@@ -982,168 +443,52 @@ If `program.md` lists Cells, the loop targets those cells explicitly. If not, th
 
 ## Escalation (`abelian/escalations.md`)
 
-The loop writes to escalations file (does NOT stop the loop) whenever:
+Loop writes (does NOT stop) on:
+- **Diversity collapse** (K>1): 5+ rounds, no new cell filled, candidate edit-distance falling
+- **Peer↔eval contradiction**: peer insists attack, eval keeps passing → eval too narrow; human expands
+- **Source-of-truth drift**: program.md Goal re-reads inconsistently mid-run (rule #16 hash catches contract drift)
+- **Attack-class re-spawn failure**: peer failed to address a class after 2 re-spawns
 
-- **Diversity collapse** (K>1): 5+ rounds with no new cell filled and candidate edit-distance falling
-- **Adversary↔eval contradiction**: adversary insists on attack but eval keeps passing → eval is too narrow; needs human to expand it
-- **Source-of-truth drift**: re-reading `program.md` Goal mid-run yields a different interpretation than round 0 → loop has rewritten the spec in its head
-- **Attack-class re-spawn failure** (v2.5): adversary failed to address a checklist class after 2 reminder re-spawns
+**Mandatory post-campaign deferral review**: before writing compound doc, run a final peer call asking for skipped/deferred/declined items + severity. Output appends to `escalations.md ## Post-campaign deferrals`. Compound doc's "Open escalations" section is REQUIRED — either list deferrals OR explicit "0 deferrals attempted" statement. Prevents silent kicked-down-the-road items.
 
-Escalations are first-class output. The loop continues on tractable branches; the final compound doc surfaces escalations under "Decisions Awaiting Human."
+## Termination Discipline
 
-### Mandatory Post-Campaign Escalation Review (v2.5)
+Loop runs till converge. No rounds/budget/wallclock caps. Termination claims valid only if mechanism-backed; rule #6's 5 forbidden rationales (diminishing returns / time-remaining / deferred-future / foundation-in-place / cleaner-to-ship) are hard refusals.
 
-Happy-path triggers above don't fire when adversary catches all attacks
-and they all convert to probes — yet the loop often **knowingly punts**
-items (P-too-low to fix this campaign / P-out-of-scope / design-decision-
-deferred-to-human). These deferred items belong in `escalations.md` but
-get lost in compound doc footnotes.
+Valid termination conditions (full spec: rule #6):
 
-**Rule**: before writing the compound doc, the loop runs ONE final
-adversary call with this prompt:
+- **Goal met** — eval ≥ target (or champion eval ≥ target)
+- **No-proposal-after-K-frame-breaks** (K=2 default) — Frame-break Protocol fired all applicable steps; resulting `candidate_routes` has zero `est_metric_delta > 0`; held for K consecutive rounds. Creative-exhaustion, not challenge-exhaustion.
+- **Mutual KILL deadlock** — N=3 rounds where both peers' mutations revert (every attack succeeds on both sides) → escalate.
+- **User interrupt** — SIGINT/SIGTERM → finish current atomic op, write handoff, exit.
 
-> The campaign converged. List concrete items the loop SKIPPED, DEFERRED,
-> or DECLINED to address that a human reviewer should know. Format each as:
-> `[severity] item-name — what would be needed / why deferred`. Empty list
-> is acceptable IFF the campaign was truly exhaustive on the in-scope items.
+**Self-check before terminating**: write `state.termination = {condition, evidence, rounds_at_termination, frame_break_count_consecutive, rule6_self_check}` block. `evidence` must cite verbatim eval/state. For `no-proposal-after-K-frame-breaks`, `evidence` MUST include `frame_break_steps_run` array showing applicable steps actually executed; missing → gate-fail.
 
-Output appends to `escalations.md` (header `## Post-campaign deferrals`).
-
-**Compound doc enforcement**: the "Open escalations" section becomes
-**required**. Either:
-- N items listed (copied from escalations.md), OR
-- Explicit statement: "Loop ran post-campaign escalation review and found
-  zero deferred items — campaign is exhaustive on in-scope items."
-
-A compound doc with empty "Open escalations" + no explicit-attempt
-statement = **protocol violation**. The loop refuses to claim "done" until
-this section is filled.
-
-**Why mandatory**: this turns "0 escalations" from a default into a
-deliberate claim. Prevents the silent kicked-down-the-road items (e.g.,
-P0-audit campaign 2026-04-26 had 4 deferred items in compound doc but
-escalations.md was empty — wrong place, wrong visibility for reviewers).
-
-## Termination Discipline (v2.15 rewrite of v2.9)
-
-Abelian runs **till converge**. There is no `--rounds` cap, no `--budget` flag, no wallclock cap. A loop's termination claim is valid only if backed by mechanism, not preference. INVARIANTS rule #6 enumerates 5 forbidden rationales — "diminishing returns", "time/token remaining", "deferred to next session", "foundation in place", "cleaner to ship". These are stopping preferences disguised as conclusions; treat them as hard refusals.
-
-**Telos**: termination requires goal-progress evidence OR creative exhaustion (Frame-break Protocol fired without positive-EV route), NOT peer-challenge-exhaustion alone. Goal is goal-fulfillment, not attack-survival. Peer challenge mechanism preserved (every round still runs with nonce header per rule #11 + attack-class checklist); challenge-exhausted no longer terminates — triggers Frame-break.
-
-Valid termination conditions (v2.15, K=2 default for frame-break exhaustion threshold):
-
-- **Goal met** — eval ≥ target (unilateral) OR champion ≥ target (co-research)
-- **No-proposal-after-K-frame-breaks** — `state.frame_break_count_consecutive ≥ K` (default K=2) AND the most recent Frame-break Protocol run yielded no `mission_thread.candidate_routes` entry with `est_metric_delta > 0` despite executing all 5 mandatory frame-break steps. This is the "creative exhaustion" termination — the LLM has demonstrably tried both its primary frame and 5 frame-break expansions without finding a positive-EV next step. See "Frame-break Protocol" section.
-- **Mutual KILL deadlock** (co-research only) — N=3 rounds where both agents' mutations revert to baseline (every attack succeeds on both sides). Escalates with "the goal as framed may be impossible / requires architecture change."
-
-**v2.15 removed conditions** (compared to v2.14):
-- ~~**Adversary exhausted across attack classes for N=3 consecutive rounds**~~ — REMOVED as standalone termination. Now triggers Frame-break Protocol; only after K consecutive frame-breaks fail does the loop terminate via no-proposal-after-K-frame-breaks. This closes the v2.14 failure mode where attack-survival could substitute for goal-progress.
-- ~~**Plateau (metric stopped improving alone)**~~ — REMOVED as standalone termination. Now triggers Frame-break Protocol. Plateau is the moment the LLM should creatively escape, not give up.
-
-If a mechanism signal would not fire by round 3+K=5, the loop has not actually converged. Either tighten the program.md target/eval or wait for the user to abort manually.
-
-**Manual abort path** (not a termination condition, an emergency stop):
-- User sends SIGINT (Ctrl+C) or SIGTERM
-- Abelian marks `state.status = "interrupted"`, finishes the current round's atomic operation if mid-commit (per night-shift's "finish current task" pattern), writes handoff/compound-doc with explicit interrupted marker, exits.
-
-**Contract-drift re-entry (v2.16)**: when a run hit
-`status=contract-drift-stopped` (rule #16 program-contract hash
-mismatch during refresh), the run is paused, not terminated. Resume:
-
-```bash
-abelian program.md --reconfirm-gate  # same RUN_ID
-```
-
-Re-runs the full round-0 Program Contract Gate (steps A–F) — fresh
-checklist + fresh baseline eval + fresh program-adversary + new
-contract hash + new confirmation. On approval, sets
-`state.round_0.reconfirmation_required = false`, stores new hash,
-clears `contract-drift-stopped`, and resumes from the next round
-(rounds completed before drift remain valid; mid-drift round if any
-was reverted on the gate trip). State.json gains a
-`reconfirmation_history[]` array recording each re-gate event with
-old hash → new hash transition.
-
-Alternative: start a new RUN_ID with the modified program.md. Choose
-based on whether the contract change is semantically continuous
-(re-confirm same campaign) or a new campaign altogether.
-
-**Self-check before terminating** (mandatory): re-read INVARIANTS rule #6 from disk (rule #3) and verify your claimed reason is on the v2.15 valid list, not the forbidden list. Document the rule-#6 self-check in `state.termination` block:
-
-```json
-"termination": {
-  "condition": "goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | interrupted",
-  "evidence": "<verbatim quote from eval/adversary/state — for no-proposal, must cite frame_break_count_consecutive and last frame-break run's empty positive-EV route list>",
-  "rounds_at_termination": 12,
-  "frame_break_count_consecutive": 2,
-  "rule6_self_check": "<one sentence — which forbidden rationale was tempting and why it does not apply>"
-}
-```
-
-If you cannot fill `rule6_self_check` with a substantive answer, you are about to terminate on a preference. Run another round.
-
-If terminating via `no-proposal-after-K-frame-breaks`, the `evidence` field MUST include the most recent round's `frame_break_steps_run` array showing all applicable steps actually executed. Termination claim with `frame_break_count_consecutive < K` or with empty `frame_break_steps_run` is gate-fail (loop refuses to terminate).
+**Contract-drift re-entry**: `contract-drift-stopped` (rule #16 hash mismatch) is paused, not terminated. Resume: `abelian program.md --reconfirm-gate` (same RUN_ID) re-runs round-0 with fresh checklist/baseline/peer-challenge/hash; on approval clears state. Alternative: new RUN_ID.
 
 ## When It Ends: Auto-Compound
 
-**Step 0 (v2.5 mandatory)**: run the Post-Campaign Escalation Review (see
-Escalation section). Loop refuses to write compound doc until escalations.md
-either has the deferred items OR has the explicit "0 deferrals attempted"
-statement.
+After loop ends, automatically write learnings to `docs/solutions/[category]/[goal-slug]-[date].md`.
 
-After the loop ends, automatically write learnings to:
+Locked field order (no free-form prose between fields, no embellishment):
 
-```
-docs/solutions/[category]/[goal-slug]-[date].md
-```
+1. **What worked** — kept mutations ranked by impact, grouped by cell (portfolio mode)
+2. **What didn't** — reverts grouped by failure pattern (eval-fail / peer-attack-fail / both)
+3. **Peer-attack catches** — attacks that flipped kept → reverted (highest-signal; prioritize for future sessions)
+4. **Judgment calls** — non-obvious decisions that mattered
+5. **Baseline → Final** — quantified improvement; per-cell deltas
+6. **Open escalations** (MANDATORY) — copy from escalations.md OR explicit "0 deferrals" statement
+7. **Next session starting point**
 
-Contents:
-- **What worked** — kept mutations ranked by impact, grouped by cell (portfolio mode)
-- **What didn't** — reverts grouped by failure pattern (eval-fail / adversary-fail / both)
-- **Adversary catches** — attacks that flipped "kept" → "reverted" (highest-signal entries; prioritize for future sessions)
-- **Judgment calls** — non-obvious decisions that mattered
-- **Baseline → Final** — quantified improvement; per-cell deltas in portfolio mode
-- **Open escalations** *(MANDATORY v2.5)* — copy of unresolved items from escalations.md including the post-campaign deferrals section. If empty, MUST include the explicit statement "Loop ran post-campaign escalation review and found zero deferred items — campaign is exhaustive on in-scope items." A blank section without this statement = protocol violation.
-- **Next session starting point**
+CE-compatible YAML frontmatter (`title`, `date`, `category`, `module`, `problem_type`, `severity`, `applies_when[]`, `tags[]`).
 
-**Locked template (v2.8).** Field order is fixed (What worked → What didn't → Adversary catches → Judgment calls → Baseline → Open escalations → Next session). No free-form prose between fields, no embellishment. The headline of any user-facing summary derived from this doc MUST be the verbatim first sentence of "What worked" — do not paraphrase, do not compose new wording. Cross-doc visual consistency is what makes scan-review across compound docs possible.
+Headline of any user-facing summary MUST be the verbatim first sentence of "What worked" — no paraphrase. Future `abelian program.md` runs on same target search `docs/solutions/` first; load prior compound doc into Strategy + Cells before starting. **Each run starts where the last one ended.**
 
-CE-compatible YAML frontmatter:
+## Execution Gate — rule #9
 
-```yaml
----
-title: "[Goal] optimization: [baseline]→[final]"
-date: YYYY-MM-DD
-category: [auto-detected]
-module: [from program.md Target]
-problem_type: best_practice
-severity: medium
-applies_when:
-  - "Re-optimizing [Target] in future sessions"
-  - "Similar optimization problems in [domain]"
-tags: [abelian, from program.md]
----
-```
+Termination requires an executed artifact: ≥1 round per cell with deterministic non-LLM eval (level 1-2: shell number / test pass-fail) where the peer saw the execution output. Two peers reaching mutual silence on a SPEC ≠ artifact surviving real execution.
 
-Future `/abelian` runs on the same target: search `docs/solutions/` first. If a prior compound doc exists, load its "what worked / what didn't / adversary catches" into Strategy + Cells before starting. **Each run starts where the last one ended.**
-
-Future `/ce:plan` runs: the learnings-researcher finds these docs automatically. No extra step needed.
-
-## Execution Gate (v2.3 termination requirement)
-
-Adversary-exhaustion is **necessary but not sufficient** for termination. The loop also requires an execution gate: at least one round per cell must have produced a Target artifact that:
-
-1. Was **actually executed** in this loop (level 1 or 2 eval)
-2. Eval at execution-time was **deterministic non-LLM** (shell returns a number, tests pass/fail, output matches acceptance criteria)
-3. Adversary saw the **execution output**, not just the spec
-
-**Why:** adversaries also tire. After N rounds, "no new attacks" can mean either "the artifact is good" or "adversary's attack imagination within its frame is exhausted." Two LLMs reaching mutual silence ≠ artifact surviving real execution. Polymarket Round 1-RETRY (2026-04-22) closed 5 attacks DISMISSED on a SPEC for fixing audit.py + aggregate_hourly.py — but no code was written or run. That's a checkpoint, not a destination. The execution gate forces the loop to reach "did it actually work" rather than stop at "did the spec survive review."
-
-**For doc-only Target** (paradigm exploration, design docs where no code exists yet): execution gate becomes "the doc was consumed by a downstream process / human and they confirmed it solved their problem." Default loop **must NOT** terminate on adversary-exhaustion alone if no executable round exists for the target cell.
-
-**How to apply at program.md level:** mark Target executable artifacts with shell-runnable Eval; set `termination_requires_execution_gate: true` (default). Doc-only mode set `termination_requires_execution_gate: false` explicitly + provide a downstream-confirmation step.
-
-**Key inversion:** when execution is in the loop, the abelian structure becomes MORE valuable, not less — adversary now has two surfaces (code logic + actual output), mutation is verifiable via git, portfolio cells produce real numbers. Spec-only mode is the corner case; executable mode is the bedrock.
+Doc-only target: `termination_requires_execution_gate: false` declared + downstream-confirmation step. Default = true.
 
 ## Migration
 
@@ -1164,23 +509,10 @@ Header `ABELIAN-ADV-v1` legacy-readable; new peer calls emit only `ABELIAN-PEER-
 
 ## Safety Rules
 
-- Never edit files outside Target
-- Never modify the eval command itself (adding regression tests to expand coverage is OK; changing what is measured is not)
-- Never run with `--adversary=off` when Eval is `self-judge` — refuse to start (no degradation)
-- When requested adversary is unavailable (e.g., codex CLI binary missing OR not auth'd OR codex MCP wrapper not configured), degrade gracefully to `dissect` — but the degradation MUST be loud (console + escalations.md + History). Silent fallback is forbidden.
-- Always revert on error
-- If metric worsens >50% in one round, flag and revert
-- **Long eval MUST be detached (v2.4).** Eval commands with any of: wallclock >30s, spill to disk, window/sort over >10M rows, or known memory footprint >2 GB MUST run via `nohup <cmd> > logs/X.log 2>&1 & echo $! > logs/X.pid`. Inline (blocking) eval is ONLY for deterministic <30s shell commands. Rationale: in-session OOM can kill the loop's parent Claude process (confirmed 2026-04-22 Polymarket DuckDB spill + 2026-04-24 FCI bench 57GB RSS balloon). Detached eval survives session death; the next round reads `logs/X.pid` + `logs/X.log` to pick up. Cap `--threads` to ~half of cores for jobs with spill-manager (DuckDB, joblib with BLAS inner) to leave headroom.
-- Respect time budget
-- Escalations file is always written (empty file is fine — proves the gate ran)
-- Adversary subagent context is isolated per round; never share its conversation across rounds
-- **Production-runtime safety (v2.7, 2026-04-26).** When Target includes a file that a production process (cron, supervisor, systemd watchdog, hot-reload server) imports continuously, the loop MUST address the file-save vs git-commit timeline gap. Two failure modes happen at every mid-cell save, not at commit boundaries: (a) production picks up WIP intermediate state between adversary rounds; (b) a fresh-fixture eval passes while the deployed state is incompatible.
-
-  **Required mitigations (pick at least one per cell that touches such a file):**
-  1. **Suspend the production process** for the campaign window — comment cron entry / stop systemd unit / pause watcher. Resume + verify one full cycle clean before claiming the cell done.
-  2. **Run eval against actual deployed state** alongside fresh-fixture eval — e.g.: `python3 -c "from <target> import <init>; import sqlite3; <init>(sqlite3.connect('<prod_db_backup>'))" || exit 1`. The prod-backup must be snapshotted at campaign start (not refreshed mid-run).
-  3. **Pre-commit DDL audit** — for any new schema column added to a cron'd DB, the loop's eval MUST verify a matching idempotent ALTER block exists. Sketch: `new_cols = git diff | grep '^\+\s+\w+ (TEXT|INTEGER|REAL)'; alters = git diff | grep 'ALTER TABLE.*ADD COLUMN'; assert alters >= new_cols`. CREATE TABLE IF NOT EXISTS alone is insufficient — it silently skips against an incumbent schema.
-
-  **Why mandatory**: 2026-04-26 pm-live-trade-infra Cell 2. I edited scanner.py twice within one commit (v1 fills schema → R2 hardening). Cron picked up v1 between edits, created production fills with 18 columns. R2 commit landed with `CREATE TABLE IF NOT EXISTS` (skipped) + `CREATE INDEX ON fills(mode, status)` (failed `no such column: mode`). Scanner crash-looped 36 minutes. The loop's adversary R2 actually flagged "schema-break" as an attack class but the verification test (`test_fills_schema_idempotent_double_migration`) only ran against fresh tmp_db — never against an incumbent v1 schema. Post-campaign reviewer correctly identified BLOCKER #1 but ran AFTER all 8 commits had landed; production was already broken. The structural insight: **abelian's atomicity model is "git commit = round = atomic deployment boundary," but cron/supervisor/watchdog observe file-save, not commit. Multi-edit commits leak intermediate states to production runtime regardless of git's view.**
-
-  **Diagnostic for whether this rule applies**: search the cron / supervisor / systemd config for the Target file path. If found, the rule applies. If unsure, suspend cron — cheap insurance.
+- Never edit files outside Target.
+- Never modify the eval command (adding regression tests OK; changing measurement is not).
+- Always revert on error. Metric worsens >50% in one round → flag and revert.
+- **Long eval MUST be detached** (>30s wallclock / spill / window-sort >10M rows / >2GB RSS): `nohup <cmd> > logs/X.log 2>&1 & echo $! > logs/X.pid`. In-session OOM kills the parent loop. Cap `--threads` to ~half cores when spill-manager involved (DuckDB, joblib).
+- Escalations file always written (empty OK — proves gate ran).
+- Peer subagent context isolated per round; no shared conversation across rounds.
+- **Production-runtime safety (rule #10)**: when Target includes a file imported by a continuously-running process (cron / supervisor / systemd / hot-reload), pick ≥1 mitigation per cell that touches it: (a) suspend production process for campaign window; (b) eval against snapshot of deployed state alongside fresh-fixture eval; (c) idempotent-ALTER assertion on every new schema column (`CREATE TABLE IF NOT EXISTS` alone silently skips against an incumbent schema). Diagnostic: search cron/supervisor config for Target path. If unsure, suspend cron — cheap insurance.
