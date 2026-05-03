@@ -432,8 +432,8 @@ abelian's state at this loop step (mutation written to working tree, not
 yet committed). If `node` is not in PATH, prefix with `bun
 /path/to/codex` (per `~/.bashrc` shim convention).
 
-**Commit-gate addition** (rule #2 conditional check 11 in v2.15
-numbering, formerly check 8 in v2.14, when `--code-review=on`):
+**Commit-gate addition** (rule #2 conditional check 11, when
+`--code-review=on`):
 
 11. `$RUN_DIR/round-N/codex-review.txt` exists, non-empty, AND contains
     no `[P1]` or `[P2]` severity markers.
