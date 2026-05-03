@@ -30,7 +30,7 @@ Examples: speedup at non-obvious algorithm level, alpha research (sharpe + ratio
 
 ## Loop (co-research mode default)
 
-Round-0 once: **Program Contract Gate** (rule #16) — checklist + Takeaway + baseline eval + program-adversary + sha256 hash + confirmation.
+Round-0 once: **Program Contract Gate** (rule #16) — checklist + Takeaway + baseline eval + program-peer-challenge + sha256 hash + confirmation.
 
 Per round:
 ```
@@ -39,7 +39,7 @@ Per round:
 2. Implement  each on its own branch
 3. Eval       execution gate + metric ratchet
 4. Cross-attack  peer-A → peer-B, peer-B → peer-A
-                 round-N/peer-{A,B}.txt with ABELIAN-ADV-v1 header (rule #11)
+                 round-N/peer-{A,B}.txt with ABELIAN-PEER-v1 header (rule #11)
 5. Verify     each attack converts to a probe; fail = revert that branch
 6. Champion   best surviving metric wins; loser preserved for inspiration
 7. Inspire    each peer reads other's mutation + attacks; feeds R+1
@@ -51,7 +51,7 @@ Per round:
 
 Termination → post-campaign escalation review writes compound doc to `docs/solutions/<category>/<goal-slug>-<date>.md`. Future runs read this first.
 
-For single-axis verification: `--mode=unilateral` (1× cost, no peer).
+Single-axis verification (typo fix, single-axis verify, ship-prep against known target) is out of abelian's scope — use a separate review tool. abelian's diversity engine has no value on single-axis tasks.
 
 ## INVARIANTS (18)
 
@@ -64,15 +64,15 @@ For single-axis verification: `--mode=unilateral` (1× cost, no peer).
 | 5 | Pre-files snapshot | git ls-files inventory (revert tax) |
 | 6 | Forbidden termination rationales | 5 stopping-preferences refused. Valid: `goal-met / no-proposal-after-K-frame-breaks / mutual-KILL / interrupted` |
 | 7 | Verbatim Goal/Target/Constraints | in adversary prompts (no paraphrase) |
-| 8 | Self-judge discipline | concrete-ground (code) or fuzzy-ground (doc/research/audit/decision) per `Eval ground:`; `--adversary=off` + self-judge hard-refused |
+| 8 | Self-judge discipline | concrete-ground (code) or fuzzy-ground (doc/research/audit/decision) per `Eval ground:`; v3.0 has no off-switch for peer challenge (always required) |
 | 9 | Execution gate | adversary-exhaustion alone insufficient |
 | 10 | Production-runtime safety | cron/supervisor/watchdog edits need extra discipline |
-| 11 | Adversary header block | `ABELIAN-ADV-v1` + nonce + timestamp + `evidence_class:` (v2.15). Co-research adversary may add informational `alternative_routes:` |
+| 11 | Peer challenge header block | `ABELIAN-PEER-v1` + nonce + timestamp + `evidence_class:`. Peers may add informational `alternative_routes:` after attacks. (v3.0 rename from `ABELIAN-ADV-v1`; legacy double-read during deprecation) |
 | 12 | Code Review supplemental gate | opt-in `--code-review=on`; refuse on `[P1]`/`[P2]` |
 | 13 | Self-attack is not adversary | conversation-level "I attacked own propose" without spawn = unilateral self-judge (rule #8 degraded), NOT co-research. 17× catch-rate gap (2026-04-29) |
 | 14 | Mission Thread per round (v2.15) | 7-field block; goal_paraphrase fresh; ≥2 candidate_routes; selection_reason cites trade-offs; mission_relevance traces Takeaway.Validated_by |
 | 15 | Evidence Class enum (v2.15) | adversary header gains `evidence_class:` `theoretical / paper / replay / settled / dry_run / live` |
-| 16 | Program Contract Gate (v2.16) | round-0: hard checklist + Takeaway-as-derived-contract + baseline eval + program-adversary + sha256 hash + TTY-aware confirmation. v2.17 amendment: Strategy=1 allowed when sharpening triage classified `single-axis` AND `--mode=unilateral` |
+| 16 | Program Contract Gate (v2.16) | round-0: hard checklist + Takeaway-as-derived-contract + baseline eval + program-peer-challenge + sha256 hash + TTY-aware confirmation. Single-axis triage exits before round-0 (out of abelian's scope) |
 | 17 | Goal-Authoring Stage (v2.17, v3.0 fold-in) | `abelian --mission "<text>"`: 5-pass protocol (triage + outcome distillation + metric forge + lever surfacing + Takeaway derivation) compiles fuzzy mission to rule #16-compliant program.md draft. Native answer to OKR's hierarchical decomposition. v3.0 dropped `abelian sharpen` subcommand; goal-authoring is now a stage of the unified loop |
 | 18 | Asymmetric peer discipline (v3.0) | PROPOSE mode: innovative + grounded (cite ≥1 file/command/output, no vibes). COUNTER mode: strictly verification-oriented (convert attack to probe, run, return PASS/FAIL or CONCEDED or NON-CODIFIABLE-ESCALATED). Argumentation without falsification target FORBIDDEN in counter |
 
@@ -148,16 +148,9 @@ python3 bench.py | tail -1
 
 Default peers: `claude+claude` (different context-framing per peer, Claude Code) or `codex+codex` (codex CLI). High-stakes cross-family: `--peers=claude+codex`. Ship-prep: `--code-review=on` (rule #12 supplemental). Fuzzy mission: `abelian --mission "<text>"`. No `--rounds` / `--budget` flags — mechanism-based termination per rule #6. Manual abort: SIGINT. Legacy v2.x flags (`--mode=`, `--adversary=`, `abelian sharpen`) deprecated; see Migration in SKILL.md.
 
-## Changelog
+## Version
 
-- **v3.0.0** (2026-05-03) — One skill, one loop, one discipline. Mode lexicon collapse: `--mode=unilateral|co-research`, `--adversary=dissect|codex|both|off`, and `abelian sharpen` subcommand all deprecated. Replaced by `--peers=<config>` (peer-tool selection, not mode), `--mission "<text>"` (fuzzy goal-authoring stage), and unified loop discipline ("every configured peer proposes AND attacks every other peer's proposals"). Rule #1 generalized to "peer challenge output on disk"; rule #11 header `ABELIAN-ADV-v1` → `ABELIAN-PEER-v1` (legacy double-read during deprecation); rule #13 reframed to "self-challenge is not co-research". **Rule #18 (NEW)**: asymmetric peer discipline — PROPOSE mode innovative + grounded; COUNTER mode strictly verification-oriented (probe-or-revert-or-escalate, no argumentation). Rule #16 A v2.17 single-axis exception removed (no unilateral mode to redirect to); single-axis triage exits with reroute diagnostic. Designed via 2-round co-research with codex; converged after Stephen + codex synthesis.
-- **v2.17.0** (2026-05-03) — Adversarial Goal Sharpening (rule #17, opt-in). `abelian sharpen "<mission>"` compiles fuzzy mission to rule #16-compliant program.md draft via 5-pass protocol (triage + outcome distillation + metric forge + lever surfacing + Takeaway derivation), reusing dissect attack classes + co-research peer pair + rule #11 nonce. Native answer to OKR's hierarchical decomposition; uses LLM enumerate-and-attack instead of human cognitive scaffolding. Designed via 2-round co-research with codex; 10 verified findings integrated. Rule #16 A amendment: Strategy=1 allowed when triage classified `single-axis` AND `--mode=unilateral` (v3.0 reverted this exception with mode lexicon collapse).
-- **v2.16.0** (2026-05-03) — Round-0 Program Contract Gate (rule #16). Closes upstream cause: fuzzy program.md leaks fuzz no matter how disciplined per-round gates are. Designed via 2-round co-research with codex (peer-B); 12 verified findings integrated.
-- **v2.15.0** (2026-05-02) — Telos shift to goal-driven co-research. Mission Thread (rule #14), Evidence Class enum (rule #15), Frame-break Protocol replaces plateau-as-termination. Anchor: codex 56-round PM dogfood produced 26 attack-clean rounds with zero metric movement.
-- **v2.14.0** (2026-04-29) — Non-code task readiness. 4 attack-class libraries (research / audit / decision / doc), doc-task cross-attack with falsification form, INVARIANTS rule #8 fuzzy-ground extension.
-- **v2.13.0** (2026-04-29) — Repositioned as adversarial collaboration framework. 13 INVARIANTS as shared scaffolding for any long-horizon LLM loop.
-
-Full history: [TODO.md](TODO.md).
+Current: **v3.0.0** — one skill, one loop, one discipline. See `git log` or GitHub Releases for history.
 
 ## Contributing
 
@@ -169,4 +162,4 @@ Style: terse, judgment-first. No hedging when a concrete claim works.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Built on Kahneman's *adversarial collaboration*, dissect's attack-class taxonomy (`skills/dissect/`), Karpathy's "compound iteration loop" framing.
+MIT — see [LICENSE](LICENSE). Built on Kahneman's *adversarial collaboration*, dissect-style attack-class taxonomy (`prompts/dissect.md`), Karpathy's "compound iteration loop" framing.

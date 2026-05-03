@@ -35,7 +35,7 @@ Most teams skip this — codex × codex with different context-framing per peer 
 | | Claude Code | Codex CLI |
 |---|---|---|
 | Entry | `/abelian program.md` | inlined `codex exec` (above) |
-| Adversary subagent | `Agent + Skill('dissect')` | fresh `codex exec` + `prompts/dissect.md` |
+| Peer subagent | `Agent(general-purpose)` + `prompts/dissect.md` inlined | fresh `codex exec` subprocess + `prompts/dissect.md` inlined |
 | Cross-family | `--adversary=codex` (built-in) | anthropic SDK (manual sketch above) |
 | State / INVARIANTS / nonce / gate / drift / modes / termination | identical |
 

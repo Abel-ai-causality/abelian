@@ -23,14 +23,18 @@ no longer produced. See Migration section.
 
 ## 2. Commit-gate (10 always-on checks + 1 conditional, all must pass before `git commit`)
 
-1. `$RUN_DIR/round-N/adversary.txt` exists and is non-empty.
-2. The file starts with the standard adversary header block (rule #11)
-   and its `nonce` field equals `state.rounds[N].adversary_nonce`.
-3. The file's mtime is later than `state.rounds[N].adversary_started_at`
-   and earlier than `now()`. (`stat -c %Y adversary.txt` vs ISO parse.)
-4. `state.rounds[N].verdict_line` appears verbatim in `adversary.txt`
-   body (`grep -qF "$VERDICT" adversary.txt`). Closes the "compacted
-   agent fabricates a clean review" hole.
+1. `$RUN_DIR/round-N/peer-A.txt` AND `$RUN_DIR/round-N/peer-B.txt`
+   exist and are non-empty.
+2. Each file starts with the standard peer challenge header block
+   (rule #11) and its `nonce` field equals
+   `state.rounds[N].peer_<slot>_nonce`.
+3. Each file's mtime is later than
+   `state.rounds[N].peer_<slot>_started_at` and earlier than `now()`.
+   (`stat -c %Y peer-<slot>.txt` vs ISO parse.)
+4. Each peer's verdict line (recorded in
+   `state.rounds[N].peer_<slot>_verdict_line`) appears verbatim in
+   the corresponding peer-N.txt body (`grep -qF "$VERDICT" peer-<slot>.txt`).
+   Closes the "compacted agent fabricates a clean review" hole.
 5. Drift check passes (rule #4).
 6. `$RUN_DIR/round-N/pre-files.txt` exists (rule #5).
 7. Eval ran in this round's process and produced the metric value
@@ -42,10 +46,9 @@ no longer produced. See Migration section.
    check; identical paraphrase = mutator skipped re-reading program.md =
    gate-fail); `selection_reason` mentions at least one unpicked route
    from `candidate_routes` by id. See rule #14 for schema.
-9. **Evidence Class enum (v2.15, rule #15)** — `adversary.txt` header
-   block contains `evidence_class:` line and value is in the v15 whitelist
+9. **Evidence Class enum (rule #15)** — each `peer-<slot>.txt` header
+   block contains `evidence_class:` line and value is in the whitelist
    (`theoretical | paper | replay | settled | dry_run | live`).
-   `peer-A.txt` and `peer-B.txt` both validated in co-research mode.
 10. **Goal-progress required (v2.15, rule #14)** — at least ONE of:
     (a) `mission_thread.metric_delta > 0`,
     (b) `mission_thread.blocker_status` ∈ `{removed, partially}`,
@@ -198,22 +201,7 @@ actually converged. Either tighten program.md (target/eval) or wait
 for the user to abort. "Running long" is a forbidden rationale —
 either fire a real mechanism signal or let the user SIGINT.
 
-**Rationale (v2.15 telos shift)**: v1.x – v2.14 inherited the
-adversarial-loop telos in which "no more attacks land" was equivalent
-to "done." Codex 56-round PM dogfood (2026-05-02) demonstrated the
-failure mode at scale: 56 rounds with attack-survival as the gate, but
-mission metric did not move meaningfully because no rule forced
-attacks to serve goal. v2.15 telos: the loop is goal-driven
-co-research, not adversary-defense. Adversary mechanisms (rules #1, #7,
-#11, #13) are 100% preserved — every round still spawns isolated
-adversary, still requires nonce header, still falsifies via attack
-classes. What changed: attack-survival is now necessary but not
-sufficient. Mission Thread (#14) anchors per-round work to goal;
-Evidence Class (#15) prevents cross-layer evidence confusion; Frame-break
-Protocol expands the loop's response to plateau from "stop" to
-"creatively break frame." This is the structural cash-out of v2.13's
-"Adversarial Collaboration Framework" rename — collaboration in the
-mechanism, not just the marketing copy.
+**Rationale**: a 56-round PM campaign showed attack-survival as standalone gate produces "attack PASS, mission metric flat" rounds indefinitely. Loop is goal-driven, not attack-defense. Peer challenge mechanisms preserved (rules #1, #7, #11, #13); attack-survival is necessary but not sufficient. Mission Thread (#14) anchors per-round work to goal; Evidence Class (#15) prevents cross-layer evidence confusion; Frame-break Protocol expands the loop's plateau response from "stop" to "creatively break frame".
 
 ## 7. Verbatim Goal/Target/Constraints in adversary prompts
 
@@ -283,9 +271,6 @@ This applies to:
   declaration makes the trace verifiable post-hoc and gives the adversary
   a concrete attack surface ("you claimed X; the ground source says Y").
 
-  **Anchor**: see TODO.md "v2.13 → future: abelian-specific gaps surfaced
-  by dry-run" (Stephen 2026-04-29) for the originating gap report. The
-  protocol above is the resolution.
 
 - Self-judge runs in isolated subagent, no shared context with mutator.
 - Rubric frozen in `program.md` Metric BEFORE loop starts; mid-run
@@ -484,16 +469,7 @@ overlap = same-prior collapse vector regardless of whether the agent
 is "mutator", "adversary", or "peer" — the load-bearing distinction
 is **spawned vs in-conversation**, not the role label.
 
-**Empirical anchor (2026-04-29 abelian self-audit dogfood)**: peer-A
-(orchestrator Claude) self-attack on 5 mutation propose found 1
-obvious finding (Validate-vs-Eval overlap). Spawned peer-B (Agent +
-Skill('dissect')) on identical input found 17 attacks across 5
-dimensions, including 4 foundational frame challenges peer-A could
-not see (e.g., "abelian vs night-shift cosmetic copy" / "propose+verify
-structurally not fit fuzzy task" / "Phase 2 dogfood polymarket =
-best-fit case sampling bias"). 17 / 1 = 17× catch rate ratio confirms
-RLHF prior overlap is severe — mutator and self-attacker share the
-same prior over BOTH "what to mutate" and "how to attack mutations".
+**Empirical anchor**: in a self-audit dogfood, an orchestrator's self-challenge on 5 mutation proposals found 1 obvious issue. A spawned peer-B with `prompts/dissect.md` payload found 17 attacks on the same input, including 4 frame challenges the self-challenger could not see. ~17× catch-rate gap confirms RLHF prior overlap is severe — agent and self-challenger share priors over BOTH "what to mutate" and "how to attack".
 
 **Trigger**: any conversation-level abelian/autoresearch reference
 that involves ANY of:
@@ -503,10 +479,7 @@ that involves ANY of:
 - "verdict / done / keep / revert / accept / pareto / trade-off"
   vocabulary applied to mutation evaluation
 
-**Required action when triggered**: spawn dispatched adversary (Agent
-+ Skill('dissect') OR codex exec subprocess) writing nonce-headered
-adversary file (rule #11) BEFORE reaching verdict. Self-attack in
-conversation context does NOT count.
+**Required action when triggered**: spawn dispatched peer (Agent with `prompts/dissect.md` inlined OR codex exec subprocess with same template) writing nonce-headered peer file (rule #11) BEFORE reaching verdict. Self-challenge in conversation context does NOT count.
 
 **Forbidden mode**: "I attacked my own propose and found these issues"
 phrased as adversary substitute. This is mutator's same RLHF prior
@@ -538,13 +511,6 @@ the user to run co-research peer manually.
   is mutator output, adversary is dispatched challenge with isolated
   context
 
-**Anti-pattern caught 2026-04-29**: peer-A used its own freshly-shipped
-memory (`feedback_human_peer_beats_llm_team_for_design_work.md`) to
-retroactively justify skipping co-research, treating Stephen's reactive
-question as "human peer-B substitute". Stephen's question is review,
-not active peer-attack. Real peer-B is a spawned agent with isolated
-context. Self-justification by selectively invoking own memory is the
-exact same-prior collapse rule #13 prevents.
 
 ## 14. Mission Thread per round (v2.15) — anchor every round to goal
 
@@ -636,17 +602,7 @@ incomplete mission_thread = commit-gate check 8 fails = revert.
   `unknown` est_metric_delta in candidate_routes, but commit-gate check
   10 limits consecutive exploration rounds to 2.
 
-**Why this rule exists**: see "v2.15 Rationale" subsection in rule #6.
-Briefly: codex 56-round PM dogfood (2026-05-02) showed that without a
-per-round goal-anchor, attacks become self-justifying ("this passed all
-attack classes" → commit) regardless of mission progress. Mission Thread
-makes goal-relevance a structural per-round artifact, not a vibe.
-
-**Empirical anchor (2026-05-02 PM trading-internal codex 56-round dogfood)**:
-adversary closed clean across 7 attack classes for rounds 30-56 yet
-mission metric (live-flip readiness) was identical at round 56 vs round
-30. v2.14 had no mechanism to flag this — every commit was gate-clean.
-v2.15 rule #14 + commit-gate check 10 reverts those rounds.
+**Why**: a 56-round PM campaign showed that without a per-round goal-anchor, attacks become self-justifying ("this passed all attack classes" → commit) regardless of mission progress. Mission Thread makes goal-relevance a structural per-round artifact, not a vibe. Commit-gate check 10 reverts rounds with `metric_delta=0 AND blocker=n/a AND exploration=false`.
 
 ## 15. Evidence Class enum in adversary header (v2.15)
 
@@ -805,7 +761,7 @@ Independent of `--adversary` flag, round-0 ALWAYS spawns dissect
 matters per-round, not at round-0 binary gate. Per-round `--adversary=codex|both`
 choice is preserved for rounds 1+.
 
-Spawn: `Agent(general-purpose) running Skill('dissect')` against
+Spawn: `Agent(general-purpose)` with `prompts/dissect.md` inlined against
 program.md as input. Attack classes locked to the program-contract
 set: `{c1-scope-drift, c2-hidden-assumption, c3-definition-elasticity,
 c4-authority-by-citation, d4-scope-creep}`. These five are the
@@ -1006,16 +962,11 @@ can re-confirm.
 
 ### Empirical anchor
 
-Codex 56-round trading-internal PM dogfood (2026-05-02): rounds 30-56
-closed adversary-clean across 7 attack classes, mission metric
-identical at round 56 vs round 30. v2.15 rule #14 + #15 fix per-round
-goal-anchor and evidence-class drift but assume program.md itself is
-sharp at round-0. If Goal is "improve trading internal" with no
-Takeaway and fabricated baseline, every round paraphrases the fuzz
-forward. Rule #16 closes this upstream cause: contract checked,
-measured, hashed, human-signed before any round runs.
-
-Design history + co-research razors: see [TODO.md](TODO.md) "v2.16".
+A 56-round PM campaign closed peer-clean across 7 attack classes while
+the mission metric stayed flat. Rule #14 + #15 fix per-round drift but
+assume program.md itself is sharp at round-0. Rule #16 closes the
+upstream cause: contract checked, measured, hashed, human-signed before
+any round runs.
 
 ## 17. Adversarial Goal Sharpening Protocol (v2.17, opt-in)
 
@@ -1356,13 +1307,6 @@ attack-clean-but-mission-flat rounds).
   re-run Pass 2-3-4. If still fails after 1 retry, escalate to user
   with diagnostic.
 
-### Empirical anchor
-
-Designed via 2-round co-research with codex (peer-B, gpt-5.5 xhigh):
-- Round 1: 6 attacks (2 BLOCKER + 4 MAJOR + 1 MINOR/MAJOR) + 4 alternative routes
-- Round 2: 4 MAJOR attacks + 6 verdicts + ACCEPT-WITH-FIXES convergence
-
-Full razor history: [TODO.md](TODO.md) "v2.17".
 
 ## 18. Asymmetric peer discipline (v3.0) — innovative-grounded propose, strictly-verification-oriented counter
 
@@ -1451,16 +1395,7 @@ Same peer, same round, two disciplines.
 
 ### Empirical anchor
 
-Codex 56-round trading-internal PM dogfood (2026-05-02): rounds 30-56
-had peer-A counter-mode arguments ("the attack assumes X but
-actually...") that landed without probes; mutations passed gate
-without verification; mission metric stayed flat. v3.0 rule #18
-makes that pattern gate-fail. PROPOSE-mode innovation gap: same
-campaign, peer-A `mission_thread.candidate_routes` had ≥2 entries per
-round but >75% were safe-incremental restatements of prior round's
-mechanism (no novel framings, no speculative routes). Rule #14
-required ≥2 entries (rule #14); rule #18 raises the bar to "≥2 entries
-WITH innovation discipline".
+A 56-round PM campaign had peer-A counter-mode arguments landing without probes; mutations passed gate without verification; mission metric stayed flat. Same campaign, peer-A's `mission_thread.candidate_routes` had ≥2 entries per round but >75% were safe-incremental restatements of prior round's mechanism. Rule #18 makes both patterns gate-fail.
 
 ### Implementation in peer prompts
 

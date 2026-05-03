@@ -26,4 +26,4 @@ Or `git clone https://github.com/Abel-ai-causality/abelian.git ~/.claude/skills/
 
 Abort: Ctrl+C → `status=interrupted`.
 
-Adversary dispatch: `Agent(general-purpose) + Skill('dissect')`. Spec: [`../../SKILL.md`](../../SKILL.md) + [`../../INVARIANTS.md`](../../INVARIANTS.md).
+Peer dispatch: `Agent(general-purpose)` with `prompts/dissect.md` inlined into the prompt (single source of truth shared with codex-cli driver). Spec: [`../../SKILL.md`](../../SKILL.md) + [`../../INVARIANTS.md`](../../INVARIANTS.md). v3.0 removed `Skill('dissect')` standalone registration; methodology lives in `prompts/dissect.md` only.

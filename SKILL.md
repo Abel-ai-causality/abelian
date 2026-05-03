@@ -57,7 +57,7 @@ description: >
   to this skill — campaign or meta-audit — that involves ≥3 mutation
   proposals, protocol-level changes, or "verdict / done / keep / revert
   / accept / pareto / trade-off" vocabulary applied to mutation evaluation
-  triggers a hard requirement: spawn a dispatched peer (Agent + Skill('dissect')
+  triggers a hard requirement: spawn a dispatched peer (Agent + prompts/dissect.md inlined
   OR codex exec subprocess) BEFORE reaching verdict. Self-challenge in
   conversation context is unilateral self-judge (rule #8 degraded mode),
   not co-research. RLHF prior overlap means an agent attacking its own
@@ -68,9 +68,7 @@ description: >
   **Target should include executable artifacts whenever possible —
   spec-only is the degraded mode for both modes.**
 
-  Per-version mechanism details + razor history live in [TODO.md](TODO.md)
-  and [README.md](README.md) changelog. SKILL.md description stays
-  timeless; changelog rotates.
+  Version history: see [README.md](README.md) Changelog or `git log`.
 
   Use when user says "abelian", "autoloop", "auto-optimize", "run experiments",
   "optimize this", "Karpathy loop", or any adversarial-collaboration mutation
@@ -86,7 +84,7 @@ allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, Skill
 
 Mutate → evaluate → **adversary** → keep/revert → repeat. When done, learnings auto-persist to `docs/solutions/` for future sessions.
 
-**v2.1 anti-collapse:** adversary on by default (dissect), portfolio K=1, escalations file always written. Cross-model adversary (`--adversary=codex`) opt-in for high-stakes runs. `--adversary=off` is a documented escape hatch but discouraged — see Eval Discipline.
+**v3.0 defaults:** peer challenge always on (refusing-off enforced); portfolio K=1; escalations file always written; cross-family pair (`--peers=claude+codex`) opt-in for high-stakes runs.
 
 **Why these defaults:** v1.0's self-judge mode shares the mutator's biases (acknowledged in the v1 caveat). v2.0 made the adversary structural — a separate agent whose job is to FIND WHAT BREAKS, never to "agree." v2.1 adds the cross-model option: same-family Claude adversaries break self-collapse but still share RLHF priors; Codex adversary breaks model-family collapse too. Termination is exhaustion of attacks, not consensus.
 
@@ -234,126 +232,42 @@ with a fresh `RUN_ID`. Cheaper to verify the gitignore upfront.
 Add the patterns and commit BEFORE the loop's first round — not as
 part of round 1 — to keep "fixture setup" out of the campaign history.
 
-## Goal-Authoring Stage (v3.0, was "Adversarial Goal Sharpening" v2.17) — INVARIANTS rule #17
+## Goal-Authoring Stage — INVARIANTS rule #17
 
-Rule #16 enforces program.md sharpness but rejects fuzzy program.md
-(measurable-noun whitelist, baseline tolerance, Takeaway derivation).
-Rule #17 is abelian's native compiler from fuzzy mission to rule
-#16-compliant program.md draft, opt-in.
-
-Native answer to OKR's hierarchical decomposition: **per-program.md-field
-adversarial sharpening with co-research divergence**. Reuses dissect
-attack classes, rule #11 nonce header, peer-A/peer-B framing — turns
-abelian's own machinery onto goal-authoring itself.
-
-### Trigger
+Triggered by `abelian --mission "<fuzzy text>"`. Rule #17 is abelian's native compiler from fuzzy mission to rule #16-compliant program.md draft. Same propose+attack discipline as the round loop, applied at goal-authoring level.
 
 ```bash
-abelian --mission "<fuzzy text>"                 # fuzzy mission, string
-abelian --mission-file <path>                    # fuzzy mission, file
+abelian --mission "<fuzzy text>"                 # string
+abelian --mission-file <path>                    # file
 abelian --mission "..." --target-hint <paths>    # bound reconnaissance
-abelian --mission "..." --interactive-sharpening # 5 mini-confirms (one per stage pass)
+abelian --mission "..." --interactive-sharpening # 5 mini-confirms
 ```
 
-File auto-detect: `abelian <existing-file>` where the file LACKS a
-`## Goal` section → orchestrator prompts "this looks like a draft, not
-a program.md. Run goal-authoring stage to compose it? (yes / no)".
-Bare strings to `abelian` are NEVER auto-classified as fuzzy missions
-(closes typo-as-mission risk; explicit `--mission` flag required).
+File auto-detect: `abelian <existing-file>` lacking `## Goal` → prompt "Run goal-authoring stage? (y/n)". Bare strings NEVER auto-classified (typo risk).
 
-**v3.0 unification**: previous `abelian sharpen` subcommand removed.
-Goal-authoring is a stage of the unified loop, not a separate mode/
-subcommand. Same propose+attack mechanism applied to goal-authoring
-artifact (program.md draft) as is applied to round-mutation artifacts
-later.
+### 5 passes (full schema in INVARIANTS rule #17)
 
-### Pass 0 — Triage
+| # | Output | Cost | Locked attack classes |
+|---|---|---|---|
+| 0 — Triage | classification: `sharp / fuzzy-but-grounded / fuzzy-ungrounded / single-axis` | ~$0.05 | n/a |
+| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | ~$0.5 | c1, c2 |
+| 2 — Metric Forge + Runnable Eval | metric + runnable Eval shell + dry-run-parse | ~$0.5 | c3, c4 |
+| 3 — Lever + Constraint | ≥2 Strategy axes + Constraints (Pass 3 attack byproduct) | ~$0.5 | d4, c1 |
+| 4 — Takeaway Derivation | mechanical compose Takeaway 3 fields | $0 | n/a (mechanical_validator) |
 
-Single LLM call (~$0.05). Classifies mission:
-
-| Classification | Action |
-|---|---|
-| `sharp` | exit, "Already sharp; write program.md and run `abelian program.md` directly" |
-| `fuzzy-but-grounded` | proceed to Pass 1 |
-| `fuzzy-ungrounded` | exit, "Route to `ce-brainstorm`; no ground sources for sharpening" |
-| `single-axis` | proceed; record `recommended_mode: unilateral`; rule #16 A v2.17 exception allows Strategy=1 |
-
-### Passes 1-4 (file-gated co-research, rule #11 inherited)
-
-Each pass writes `pass-N/{peer-A.md, peer-B.md, adversary.txt, converged.md}`.
-Adversary header: `ABELIAN-ADV-v1` + `peer: sharpen-pass-N` + `evidence_class: theoretical`.
-
-| Pass | Output | LLM dispatch | Locked attack classes | Converge predicate |
-|---|---|---|---|---|
-| 1 — Outcome Distillation + Grounding | observable end-state + ≥1 ground citation | 2 peer + 1 adversary | c1-scope-drift, c2-hidden-assumption | attack_survival + mission_traceability + rule_16_composability (Goal clause) |
-| 2 — Metric Forge + Runnable Eval | metric (name/direction/tolerance/baseline=TBD) + runnable shell command | 2 peer + 1 adversary + 1 dry-run-parse | c3-definition-elasticity, c4-authority-by-citation | + Eval command parses to number AND files exist |
-| 3 — Lever + Constraint (merged) | ≥2 Strategy axes (or 1 if single-axis) + Constraints (Pass 3 attack byproduct) | 2 peer + 1 adversary | d4-scope-creep, c1-scope-drift | + ≥2 surviving (or 1 if single-axis) |
-| 4 — Takeaway Derivation | mechanical compose Takeaway 3 fields | 0 LLM (pure derivation) | n/a | mechanical_validator_passed: source_coverage + rule_16_B_quote_grep + semantic_linkage |
+Pass 0 exits early on `sharp` (already program.md-grade) or `fuzzy-ungrounded` (route to ce-brainstorm) or `single-axis` (route to a different review tool).
 
 ### Bounded reconnaissance
 
-Sharpening reads ONLY:
-- Fuzzy mission text (always)
-- `--target-hint <paths>` values, if passed
-- Top-3 noun keyword grep across repo (≤1 grep per noun)
-- Last 200 lines of session history (Claude Code only; codex-cli records `not_available`)
-
-Each entry recorded in `trace.json.reconnaissance[]` with `command`,
-`hit_count`, `selected_excerpt_path`, `selected_excerpt_text`,
-`citation_type` (`user_message | target_hint | grep_hit | session_tail`).
-
-Forbidden: full repo TODOs scan, CLAUDE.md scan, full git log,
-unrelated specs. Anti-fabrication discipline — more reconnaissance =
-more authority the LLM can fabricate from weak hits.
-
-### Composition
-
-After Pass 4 converges, sharpening assembles a `program.md` draft from
-pass artifacts (Goal from Pass 1; Eval from Pass 2; Strategy + Constraints
-from Pass 3; Takeaway from Pass 4; Eval ground always includes (d) verbatim
-fuzzy_mission). Draft enters rule #16 round-0 gate as if user wrote it.
-
-### state.sharpening + trace.json
-
-Per-pass `artifact_integrity` (path, sha256, nonce, started_at,
-verdict_line, model_or_peer, retry_count) enables full audit. Pass 2
-adds `eval_dry_run_parse` (verifies the metric command emits a number
-before round-0 gate runs it for real). Full schema in INVARIANTS rule
-#17 sections "state.sharpening schema" and "trace.json schema".
+Reads only: fuzzy mission text, `--target-hint` paths, top-3-noun keyword grep, last 200 lines of session history. Forbidden: full repo TODOs, CLAUDE.md, full git log. Each citation recorded in trace.json with `citation_type` (`user_message | target_hint | grep_hit | session_tail`).
 
 ### Cost
 
-| Component | Cost |
-|---|---|
-| Pass 0 triage | ~$0.05 |
-| Pass 1-3 (each: 2 peer + 1 adversary) | ~$1.50 total |
-| Pass 4 (mechanical) | $0 |
-| **v2.17 sharpening total** | **~$1.55-2.05** |
-| + rule #16 round-0 program-adversary | ~$0.10 |
-| **Per fuzzy mission** | **~$1.65-2.15** |
+~$1.65-2.15 per fuzzy mission ($1.55 sharpening + $0.10 round-0 program-adversary). 100× ROI on a single multi-round-fuzz catch.
 
-100× ROI on a single 56-round-fuzz catch ($3-5 wasted on
-attack-clean-but-mission-flat rounds).
+### Why not OKR
 
-### Fail-out paths
-
-| Trigger | Action |
-|---|---|
-| Pass 0 → `sharp` | exit, "Already sharp" |
-| Pass 0 → `fuzzy-ungrounded` | exit, "Route to ce-brainstorm" |
-| Pass 1-3 mutual-KILL (2 retries) | re-run Pass 0 triage with diagnostic |
-| Pass 4 mechanical_validator fails | route back to Pass 2 with c3-definition-elasticity input |
-| All retries exhausted | escalate to user with diagnostic; abort |
-
-### Why this and not OKR
-
-OKR (Objective → Key Results → Tasks) is hierarchical decomposition done
-by the user. abelian sharpening is per-field adversarial cycles done by
-LLM peer pair + dissect adversary. In the LLM era, enumerate-and-attack
-leverages model strength (parallel framings, cross-attack, mechanism
-surfacing) where OKR's KR step relies on user cognitive scaffolding.
-night-shift uses OKR as upstream to abelian; v2.17 is the abelian-native
-alternative for users who want to stay within the framework.
+OKR is user-driven hierarchical decomposition (Objective → KR → Task). v3.0 is per-field adversarial cycles done by peer pair + dissect — leverages LLM enumeration + cross-attack rather than user cognitive scaffolding. Full schema, fail-out paths, and trace.json structure live in INVARIANTS rule #17.
 
 ## State Persistence (v2.8) — `$RUN_DIR/state.json`
 
@@ -443,7 +357,7 @@ triggered):
   ],
   "program_md_draft_path": "program.md",
   "trace_json_path": "$RUN_DIR/sharpening/trace.json",
-  "recommended_flags": ["--mode=co-research"]
+  "recommended_flags": ["--peers=claude+claude"]
 }
 ```
 
@@ -625,11 +539,11 @@ For each round:
 1. **Hypothesize** — read Strategy + state.json `rounds[]` + current state → generate ONE testable change. Tag the change with a cell label (free-text, ≤3 words).
 2. **Mutate** — apply the change (minimal, one idea per round). Before writing, snapshot pre-files: `mkdir -p $RUN_DIR/round-N && { git ls-files -z; git ls-files -z --others --exclude-standard; } | sort -zu > $RUN_DIR/round-N/pre-files.txt`. INVARIANTS rule #5.
 3. **Evaluate** — run eval command, or self-judge against frozen rubric. Write metric value to `$RUN_DIR/round-N/eval.txt` and update `state.rounds[N].metric_value`.
-4. **Adversary** — spawn `Agent(general-purpose)` that runs `Skill('dissect')` on the diff + eval output. Adversary subagent MUST write full attack list (or `n/a-this-target` per class) to `$RUN_DIR/round-N/adversary.txt` BEFORE returning, and the verdict line MUST be recorded in `state.rounds[N].verdict_line`. INVARIANTS rules #1, #7. (See Adversary section.)
+4. **Peer challenge** — spawn one peer subagent per configured peer (default 2: peer-A + peer-B), each running `prompts/dissect.md inlined` (Claude) or `codex exec` (codex CLI) on the diff + eval output. Each peer MUST write its full attack list (or `n/a-this-target` per class) to `$RUN_DIR/round-N/peer-<slot>.txt` BEFORE returning. Each peer's verdict line MUST be recorded in `state.rounds[N].peer_<slot>_verdict_line`. INVARIANTS rules #1, #7, #18. (See Peer Challenge section.)
 5. **Confirm** — no attacks: run commit-gate (INVARIANTS rule #2, **10 always-on checks + 1 conditional**, v2.15):
    1–7: `adversary.txt` non-empty + header block nonce matches `state.adversary_nonce` + mtime in `(adversary_started_at, now)` + verdict_line `grep -qF` in body + drift check + `pre-files.txt` exists + eval value matches state.
    **8 (v2.15, rule #14)**: `state.rounds[N].mission_thread` complete (7 fields populated, ≥2 candidate_routes, goal_paraphrase ≠ prior round's, selection_reason references at least one unpicked route).
-   **9 (v2.15, rule #15)**: adversary header `evidence_class:` field present and in whitelist (`theoretical | paper | replay | settled | dry_run | live`); both peer-A and peer-B in co-research.
+   **9 (rule #15)**: each peer-N header `evidence_class:` field present and in whitelist (`theoretical | paper | replay | settled | dry_run | live`).
    **10 (v2.15, rule #14)**: goal-progress required — `mission_thread.metric_delta > 0` OR `blocker_status ∈ {removed, partially}` OR (`exploration_round=true` AND `state.frame_break_count_consecutive ≤ 2`). Pure attack-survival with `metric_delta=0 AND blocker=n/a AND exploration=false` is gate-fail.
    **11 (conditional, rule #12)**: when `--code-review=on`, run `codex review --uncommitted -c 'model_reasoning_effort="high"'` → `codex-review.txt` non-empty AND no `[P1]`/`[P2]` markers.
    All checks pass → `git commit`. Any fail → revert (`git checkout` + scoped clean of new files via pre/post diff), mark round `gate-failed`. With attacks: convert each to a verification (regression test, worst-case benchmark input, or added rubric criterion) and re-eval. Any verification fails → revert. Black-box eval with no augmentation surface: log attack as `provisional-flag`, keep but mark.
@@ -648,16 +562,16 @@ distinct role.
 
 **Driver-neutral protocol**: a fresh peer subagent receives a prompt that includes verbatim `program.md` Goal/Target/Constraints/Attack-Classes + a fresh nonce + ISO timestamp, executes in isolated context with its own tool access (Read/Bash/Write or equivalent), writes the attack list to `$RUN_DIR/round-N/peer-<slot>.txt` with a mandatory `ABELIAN-PEER-v1` header (rule #11), and returns the verdict line. Two reference dispatches:
 
-- **Claude Code primary**: `Agent(general-purpose)` running `Skill('dissect')` — see [`drivers/claude-code/README.md`](drivers/claude-code/README.md). This is the default for `/abelian program.md` invocation in a Claude Code session. Adversary subagent is a Claude with same RLHF family as the mutator — structural role split, weak prior split.
+- **Claude Code primary**: `Agent(general-purpose)` running `prompts/dissect.md inlined` — see [`drivers/claude-code/README.md`](drivers/claude-code/README.md). This is the default for `/abelian program.md` invocation in a Claude Code session. Adversary subagent is a Claude with same RLHF family as the mutator — structural role split, weak prior split.
 - **Codex CLI primary**: `codex exec - -s workspace-write` subprocess + the [`prompts/dissect.md`](prompts/dissect.md) template — see [`drivers/codex-cli/README.md`](drivers/codex-cli/README.md). Self×self default (codex × codex with different prompt context per role at full max-effort). No wrapper script — codex CLI is itself an LLM agent harness consuming SKILL.md directly, the same way Claude Code does.
 
-Both drivers honor the same protocol and INVARIANTS. The descriptions below use Claude Code idiom (Agent / Skill / MCP) because abelian's original implementation was Claude Code. Codex CLI users substitute `codex exec` for `Agent(...)` and `prompts/dissect.md` content for `Skill('dissect')`. Mechanism, header, gate, and INVARIANTS are byte-for-byte identical.
+Both drivers honor the same protocol and INVARIANTS. The descriptions below use Claude Code idiom (Agent / Skill / MCP) because abelian's original implementation was Claude Code. Codex CLI users substitute `codex exec` for `Agent(...)` and `prompts/dissect.md` content for `prompts/dissect.md inlined`. Mechanism, header, gate, and INVARIANTS are byte-for-byte identical.
 
 Peer pair via `--peers=<config>`:
 
 | Value | Pair | Prior separation | Cost | When to use |
 |-------|------|------------------|------|-------------|
-| `claude+claude` (Claude Code default) | Two Claude subagents with `Skill('dissect')`, different context-framing per peer | Weak (same RLHF family, but different framing) | 2× | Most cases, zero-config, portable |
+| `claude+claude` (Claude Code default) | Two Claude subagents with `prompts/dissect.md inlined`, different context-framing per peer | Weak (same RLHF family, but different framing) | 2× | Most cases, zero-config, portable |
 | `codex+codex` (Codex CLI default) | Two codex exec subprocesses with `prompts/dissect.md`, different framing per peer | Weak (same family, different framing) | 2× | Codex-CLI-native runs |
 | `claude+codex` | Cross-family pair (one peer Claude, one peer codex via subprocess; codex CLI required + auth'd) | Strong (cross model family) | 2× (higher per-call) | High stakes, self-judge eval, key decisions |
 
@@ -665,7 +579,7 @@ For 3-peer / N-peer topologies (e.g., adding codex as third reviewer): use `--co
 
 `--adversary=off` (v2.x) is REFUSED in v3.0 — abelian without peer challenge is not abelian.
 
-**File-gated output (v2.8).** The adversary subagent MUST write its full attack list (or empty list with explicit `n/a-this-target` per attack class) to `$RUN_DIR/round-N/adversary.txt` BEFORE returning. Co-research writes `peer-A.txt` and `peer-B.txt` separately. Conversation-only return = invalid, fails commit-gate. The agent prompt MUST quote `program.md` Goal/Target/Constraints/Attack-Classes verbatim — paraphrasing forbidden. INVARIANTS rules #1, #7.
+**File-gated output.** Each peer subagent MUST write its full attack list (or empty list with explicit `n/a-this-target` per attack class) to `$RUN_DIR/round-N/peer-<slot>.txt` BEFORE returning. Conversation-only return = invalid, fails commit-gate. The agent prompt MUST quote `program.md` Goal/Target/Constraints/Attack-Classes verbatim — paraphrasing forbidden. INVARIANTS rules #1, #7.
 
 **Header-block protocol (v2.8 anti-fabrication, v3.0 PEER-v1 rename).** Before each peer challenge call, the orchestrator generates a fresh `nonce` (16 hex via `secrets.token_hex(8)`) and `started_at` (ISO ms) and writes both into `state.rounds[N].{peer_<slot>_nonce, peer_<slot>_started_at}`. The prompt instructs the subagent to write a mandatory header block (`ABELIAN-PEER-v1` + run_id + round + peer + nonce + started_at + verdict, then `---`, then attacks) as the first lines of the output file. Commit-gate verifies nonce match + mtime in valid range + verdict in body. INVARIANTS rule #11. This is friction-level defense (not cryptographic) targeting Threat-1: post-compaction "forgot to call peer" silent fabrication. An orchestrator must now cat state.json to find the nonce, which triggers cat INVARIANTS, which surfaces "must actually call peer."
 
@@ -683,11 +597,9 @@ For 3-peer / N-peer topologies (e.g., adding codex as third reviewer): use `--co
 
 **Honest limit:** Default `claude+claude` (or `codex+codex` on codex CLI) with different framing breaks structural self-collapse but does NOT break model-family collapse. Two Claudes with different framing still share RLHF priors. For high-stakes decisions, `--peers=claude+codex` is the cross-family upgrade.
 
-**v2.15 termination shift**: termination is no longer "adversary exhausted across N rounds." Adversary-exhausted is now an **informational signal** that triggers Frame-break Protocol (5-step mandatory creative-escape sequence; see "Frame-break Protocol" section). Only after K consecutive frame-break rounds yield no positive-EV `candidate_route` does the loop terminate via `no-proposal-after-K-frame-breaks`. Termination conditions per rule #6: `goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | user-interrupt`.
+**Termination**: peer-challenge-exhausted is an informational signal that triggers Frame-break Protocol; only `no-proposal-after-K-frame-breaks` (after 5-step creative escape fails) terminates on exhaustion. Conditions per rule #6: `goal-met | no-proposal-after-K-frame-breaks | mutual-KILL | user-interrupt`.
 
-**Why this changed (v2.15)**: codex 56-round trading-internal PM dogfood (2026-05-02) showed attack-survival as standalone gate produces "attack PASS, mission metric flat" rounds indefinitely. v2.14 had no mechanism to flag this; every commit was gate-clean. v2.15 makes goal-progress a structural commit-gate check (rule #2 check 10) and removes adversary-exhausted from termination — attack mechanism is 100% preserved (every round still runs adversary with nonce header per rule #11 and attack-class checklist), but attacks no longer terminate the loop on their own. **v2.5 refinement still applies**: when adversary-exhausted DOES contribute to a frame-break trigger, "exhausted" still means measured ACROSS the Attack Class Checklist — single-adversary single-frame exhaustion is not even enough to trigger frame-break, let alone terminate.
-
-**v2.6 fundamental upgrade — Co-Research Mode**: unilateral attack-only is
+**Two peers, both propose AND attack**: unilateral attack-only is
 itself a collapse vector when the work involves discovery, not just
 verification. Stephen 2026-04-26: "竞争合作最重要——两边要都互相 challenge
 和互相启发，不然会坍缩，要 goal driven." When generator only proposes and
@@ -696,251 +608,47 @@ adversary only attacks, two failure modes:
   topping at +3.6% sharpe in adversarial mode vs 20%+ in collaborative)
 - Generator collapses to RLHF prior (no fresh attack frame inspires it)
 
-Co-research mode (`--mode=co-research`) makes both agents do BOTH propose
-AND challenge each other, with goal-driven termination. See "Co-Research
-Mode" section below.
+v3.0 unifies on this: both peers always do BOTH propose AND challenge,
+with goal-driven termination + rule #18 asymmetric discipline (innovative
++ grounded when proposing, strictly verification-oriented when countering).
+See "Co-Research Mode" section below.
 
-## Co-Research Mode (v2.6) — Bidirectional Peer Challenge
+## Peer Loop (v3.0)
 
-**Why** (Stephen 2026-04-26 directive): "竞争合作最重要——两边要都互相
-challenge 和互相启发，不然会坍缩，要 goal driven."
+Two peers (default). Each round:
 
-Unilateral attack-only is a hidden collapse vector for any non-trivial
-work involving discovery (not just verification). Two failure modes:
-- **Adversary-collapse**: pure-attack adversary tops out at "all-KILL"
-  (polymarket Codex adversarial mode capped +3.6% sharpe; collaborative
-  mode found 20%+ structural arb in same time).
-- **Generator-collapse**: propose-only generator with no fresh attack
-  frame collapses to RLHF prior; no inspiration in.
-
-Co-research makes BOTH agents do BOTH actions per round, with mandatory
-cross-model pairing for prior diversity.
-
-### Mode comparison
-
-| Mode | Generator role | Adversary role | Cost | When |
-|---|---|---|---|---|
-| Unilateral (default v2.5) | propose + implement | attack-only | 1× | Verification of known target, ship-prep, audit |
-| **Co-research (v2.6)** | A: propose + challenge B  |  B: propose + challenge A | 2× | Discovery, novel design, research, "where do I even start" |
-
-### Co-research loop per round
-
-1. **Parallel propose** — A and B each generate one mutation toward the
-   declared goal (Stephen's framing: "goal driven"). They MUST take
-   different angles (enforced via Strategy axes; if axes collapse,
-   ESCALATE). Each writes to `abelian/peer-A/round-N/` and
-   `abelian/peer-B/round-N/`.
+1. **Parallel propose** — peer-A + peer-B each generate one mutation, different angles. Strategy-axis split + per-peer context-framing forces divergence. Output: `peer-A/round-N/`, `peer-B/round-N/`.
 2. **Parallel implement** — each on its own branch.
-3. **Eval both** — execution gate + eval fitness. Both must pass
-   execution gate (no spec-only champions).
-4. **Cross-attack** — A attacks B's mutation through the v2.5 Attack
-   Class Checklist. B attacks A's mutation symmetrically. Self-attack
-   permitted but tracked separately (`source: self-check` vs
-   `source: peer-attack`); only peer-attack counts toward exhaustion.
-5. **Verification** — each attack converts to a probe. Probe pass =
-   attack falsified, mutation survives that attack. Probe fail =
-   mutation reverts on its branch (does NOT take down the campaign).
-6. **Champion** — surviving best-eval mutation = round champion.
-   Loser branch is preserved (portfolio-style) — failed mutations
-   are training data for next round, not garbage.
-7. **Mutual inspiration** — explicit step. Each agent reads:
-   - the OTHER's mutation (what new direction did they try?)
-   - the OTHER's attacks on ITSELF (what did they catch?)
-   These feed into the agent's NEXT propose. The prompt for round R+1
-   MUST include "your peer's last mutation was X, your peer's attacks
-   on you were Y — use both to inform your R+1 proposal."
-8. **Goal-driven termination** — see Termination subsection below.
+3. **Eval both** — execution gate + metric ratchet on each.
+4. **Cross-attack** — peer-A attacks peer-B's mutation; peer-B attacks peer-A's. Both write `peer-{A,B}.txt` with `ABELIAN-PEER-v1` header (rule #11) using `prompts/dissect.md` template. Rule #18 governs propose-vs-counter discipline.
+5. **Verify** — each attack converts to a probe (rule #18 COUNTER mode); probe fail → mutation reverts on its branch.
+6. **Champion** — best surviving metric wins. Loser preserved for inspiration.
+7. **Mutual inspiration** — each peer reads other's mutation + attacks; feeds R+1.
+8. **Converge** — rule #6 termination conditions; "stuck" → Frame-break Protocol.
 
 ### Pair configuration
 
-`--pair=<A>,<B>` configures the two peers. **Diversity comes from
-DIFFERENT CONTEXT FRAMING per peer, not from one peer being weaker.**
-Stephen 2026-04-26 correction: "co-research 也要用 opus 4.7 max effort
-不一样的 context 而已" — downgrading one peer to a smaller model dilutes
-proposal quality without proportionate diversity gain. Both peers should
-run at full capability; diversity is engineered via prompt framing
-(different file reads, different attack angle, different goal-emphasis).
+`--peers=<A>+<B>` — diversity comes from DIFFERENT CONTEXT FRAMING per peer at SAME max-effort tier. Don't downgrade one peer.
 
-| Pair | Diversity source | Cost | Allowed? |
-|---|---|---|---|
-| `claude-opus,codex-latest` (currently `gpt-5.5`) | Cross-model + per-peer context-framing | Highest | ✓ default for high-stakes |
-| `claude-opus,claude-opus + different context` | Per-peer context-framing only | High×2 | ✓ default when codex unavailable |
-| `claude-opus,claude-haiku` | Cross-scale (weaker B) + context-framing | Medium | ⚠ fallback only — Peer B proposes weaker, less productive synthesis |
-| `claude-opus,claude-opus + same context` | None | High×2 | ✗ rejected — pure RLHF-prior overlap, no signal |
+| Pair | Diversity source | When |
+|---|---|---|
+| `claude+codex` | Cross-family + framing | High-stakes |
+| `claude+claude` (Claude Code default) | Same-family + different framing | Most cases, codex unavailable |
+| `codex+codex` (codex CLI default) | Same-family + different framing | Codex-CLI-native runs |
 
-**Empirical validation (2026-04-26 audit-followup-boss-grasp campaign,
-first co-research dogfood)**:
-- Round 1 used opus×haiku (BOSS bug): haiku Peer B gave decent attack
-  list but missed the synthesis. Peer A had to drive the dispatch-level
-  fix solo.
-- Round 2 used opus×opus + different-context (GRaSP cache enable):
-  Peer B caught 2 attacks Peer A would've shipped without (d>30 OOM
-  risk, CV-determinism future-proofing). Synthesis materially improved.
+Context-framing recipes (peers must read DIFFERENT slices, not just different prompts): top-down vs bottom-up code reading; implementer vs auditor framing; Strategy axes 1,3,5 vs 2,4,6; smallest-fix vs most-robust-fix; etc.
 
-Confirms: **same-tier model with different context >> different-tier
-same-context** for substantive co-research.
+### Doc-task cross-attack (v2.14)
 
-### Context-framing recipes for opus×opus pairs
+Doc-diff has no test/type/regression failure mode. Peers attacking prose degenerate into "I prefer my style" (rule #13 same-prior collapse). v2.14 fix: every doc attack MUST satisfy criterion-4 form `"this is wrong if X, because the doc claims Y at line M"` where X is **grep-able / runnable / countable / verifiable factual claim** about external state. Aesthetic / "feels off" / "unclear" / "lacks rigor" attacks auto-rejected. Empty attack list acceptable IFF each Attack Class concretely probed AND `n/a` reason includes grep-able trace.
 
-To engineer diversity without different models:
-- Peer A: load codebase top-down (read main entry → trace down to bug site)
-- Peer B: load codebase bottom-up (read leaf utility → trace up to caller)
-- Peer A prompted as "implementer" (propose fix)
-- Peer B prompted as "auditor" (propose attack list against any fix)
-- Peer A reads `Strategy` axes 1, 3, 5; Peer B reads axes 2, 4, 6
-- Peer A starts from "what's the smallest fix", B starts from "what's
-  the most robust fix"
+If >50% of a peer's attacks fail criterion-4 after re-spawn → escalate to `state.rounds[N].coresearch_degraded: true` + dispatch a single fresh peer (rule #1 + #11 still binding).
 
-The dispatch should give each peer a DIFFERENT slice of context, not
-just a different prompt prefix.
+Applies to: SKILL.md / program.md / design docs / proposals / decision recs / research writeups. Does NOT apply to code-diff (use default Attack Classes) or executable specs (use rule #9 execution gate).
 
-When codex CLI unavailable at startup → degrade to `claude-opus,claude-opus
-+ different context`, NOT to `claude-opus,claude-haiku`. Loud notice
-in console + escalations.md (same protocol as unilateral).
+### Cost
 
-### Doc-task cross-attack: making prose attackable (v2.14)
-
-Code-diff cross-attack has clear failure modes (test fail / type error /
-regression). Doc-diff has none — peers attacking each other's prose
-naturally degenerate into "I prefer my style," which is unilateral self-
-attack disguised as cross-review (rule #13's same-prior collapse, applied
-to evaluation rather than mutation).
-
-A "real attack" on a doc must satisfy ALL FIVE criteria:
-
-1. **Concrete** — cite the specific line / paragraph / claim being attacked
-   (line N or quoted phrase verbatim).
-2. **Falsifiable** — the attack states what would have to be true for the
-   doc to be wrong, in a form the author can verify or refute.
-3. **Class-grounded** — labeled with a doc-class attack class (C1–C4 from
-   the Attack Class Library) or another named class.
-4. **Explicit falsification statement with grep-able / runnable / countable X**
-   — every attack MUST include a sentence in the form
-   `"this is wrong if X, because the doc claims Y"`, where:
-   - X is one of: (a) a grep-able quote/pattern in the doc or another
-     file (e.g., `grep -F "foo" file.md returns 0 hits`), (b) a shell
-     command output (e.g., `running scripts/check.py exits ≠ 0`), (c) a
-     count/measurement (e.g., `the doc has 3 sections claiming Z but
-     only 1 has supporting evidence`), or (d) a verifiable factual claim
-     about external state (e.g., `numpy 2.0 removed np.foo per
-     numpy/numpy#1234`).
-   - X is NOT: aesthetic preference, reader hypothesis ("a reader cannot
-     follow"), tone judgment, rigor judgment, "feels" / "seems" /
-     "unclear" / "hard-to-follow" / "muddled" / "lacks rigor" / "could be
-     clearer" / variants thereof.
-   - Y is a verbatim or paraphrased quote from the doc, with the doc's
-     line number cited.
-5. **Resolvable** — the doc author can either (a) accept and edit, (b)
-   point to where the doc already addresses the attack, or (c) explicitly
-   defer with rationale. "I disagree" without one of these three is invalid.
-
-**Cross-attack prompt template (co-research peer dispatch, doc-task)**:
-
-> You are reviewing peer-A's draft of [doc target, path]. Your job is to
-> find what BREAKS, not what you would have written differently. Apply the
-> doc-class attack library (C1–C4) plus any program.md domain extensions.
->
-> For each attack, output exactly this structure:
->
-> ```
-> [class label, e.g., C1 / C2 / domain-name]
-> Cite: <line N or "quoted phrase">
-> Falsification: this is wrong if <X — grep-able / runnable / countable observation>, because the doc claims (line M) <Y verbatim>
-> Severity: BLOCKER | MAJOR | MINOR
-> Resolution: <accept-and-edit | already-addressed-at-line-N | defer-with-rationale>
-> ```
->
-> Empty attack list is acceptable IFF every C1–C4 was concretely probed
-> against the draft AND the n/a reason includes a **grep-able trace**, not
-> a bare assertion. Example acceptable: `C1 n/a — grep -nE "scope|expand|
-> beyond" draft.md returned only Goal-declared entries at lines 12–18`.
-> Example rejected: `C1 n/a — no scope drift`.
-
-**Forbidden in attacks** (orchestrator auto-rejects round; respawn required):
-- Any attack lacking the explicit "this is wrong if X, because Y" form
-  (criterion 4) — this is the structural defense; literal-string filters
-  on phrases like "could be clearer" are bypassable, the form requirement
-  with grep-able / runnable / countable X is not.
-- X reduces to aesthetic / reader-experience / tone / rigor judgment, even
-  when wrapped in the falsification form.
-- Class label without falsification statement.
-- n/a-this-target without grep-able trace.
-
-**Failure modes**:
-
-- Peer returns >50% attacks failing criterion 4 → re-spawn with explicit
-  "criterion 4 violation, retry with grep-able / runnable / countable X
-  required."
-- After 2 re-spawn failures on the same peer → escalate
-  (`escalations.md`, mark doc-task `cross-attack-degenerate`) AND switch
-  to **dispatched-single-adversary mode**: orchestrator dispatches a
-  brand-new adversary subagent (`Agent + Skill('dissect')` or
-  `codex exec` subprocess), writing nonce-headered `adversary.txt` per
-  rule #11. State.json records this round with
-  `state.rounds[N].coresearch_degraded: true` for post-campaign provenance.
-  This is unilateral mode (rule #1 + rule #11 + rule #8 self-judge gate
-  all active), NOT mutator-attacks-own-propose-in-conversation (forbidden
-  by rule #13). Escalation acknowledges co-research has degenerated for
-  this round; it does NOT relax the dispatched-adversary requirement.
-
-**Applies to**: SKILL.md edits, program.md drafts, design docs, proposal
-docs, plan files, decision recs, research-output writeups.
-
-**Does NOT apply to**: code-diff (use default 7 + code-domain extensions),
-executable specs (use research-class + execution gate per rule #9), data
-analysis output (use research-class + audit-class).
-
-### Goal-driven termination (v2.15 — applies to BOTH modes now)
-
-v2.15 unifies the termination schema across unilateral and co-research
-(previously, co-research had its own narrower set; v2.15 extends the
-co-research telos to unilateral and adds Frame-break Protocol as the
-shared creative-escape mechanism).
-
-Both modes terminate on (per INVARIANTS rule #6):
-
-1. **Goal met** — eval ≥ target (unilateral) OR champion eval ≥ target
-   (co-research) → DONE.
-2. **No-proposal-after-K-frame-breaks** — `state.frame_break_count_consecutive
-   ≥ K` (default K=2) AND the most recent Frame-break Protocol run
-   yielded no `candidate_routes` entry with `est_metric_delta > 0`
-   despite executing all 5 frame-break steps. This is the v2.15
-   "creative exhaustion" termination — the LLM has tried both its
-   primary frame and 5 expansions and still cannot generate a
-   positive-EV next step. **Plateau-on-metric and adversary-exhausted
-   alone do NOT terminate**; they trigger Frame-break Protocol instead.
-3. **Mutual KILL deadlock** (co-research only) — N=3 rounds where both
-   agents' mutations revert to baseline (every attack succeeds on both
-   sides) → ESCALATE ("the goal as framed may be impossible / requires
-   architecture change").
-4. **User interrupt** — SIGINT/SIGTERM → `status=interrupted`, finish
-   current atomic operation, write handoff, exit.
-
-`adversary-exhausted` and `metric-plateau-alone` are explicitly NOT
-termination conditions in v2.15 (either mode). They are signals that
-trigger Frame-break Protocol. See "Frame-break Protocol" section
-below for the 5-step creative-escape sequence the loop runs BEFORE
-declaring `no-proposal-after-K-frame-breaks`.
-
-### Cost vs unilateral
-
-2× per round (two implement + two eval + two attack). Mitigated by:
-- Higher per-round info gain (two angles explored, mutual inspiration)
-- Lower expected total rounds (goal-driven plateau detection stops earlier)
-- Better escape from local optima (one peer's failure becomes the other's input)
-
-Empirical (TBD; first co-research run will calibrate): expect 2× cost
-per round but ~1.5× fewer rounds for non-trivial work → ~33% net
-overhead for substantially better diversity coverage.
-
-### When NOT to use co-research
-
-- Trivial fix (typo, rename, single-line patch) — overhead dominates
-- Pure verification of known target (use unilateral with attack-class
-  checklist + cross-model adversary instead)
-- Single-axis optimization with one obvious mechanism (no diversity
-  to leverage)
-- Cost-sensitive batch (cron jobs, nightly sweeps) — unilateral is cheaper
+2× per round vs single-peer review. Mitigated by ~1.5× fewer rounds on non-trivial work via mutual inspiration → ~33% net overhead.
 
 ## Frame-break Protocol (v2.15) — creative escape, not termination
 
@@ -1320,7 +1028,7 @@ escalations.md was empty — wrong place, wrong visibility for reviewers).
 
 Abelian runs **till converge**. There is no `--rounds` cap, no `--budget` flag, no wallclock cap. A loop's termination claim is valid only if backed by mechanism, not preference. INVARIANTS rule #6 enumerates 5 forbidden rationales — "diminishing returns", "time/token remaining", "deferred to next session", "foundation in place", "cleaner to ship". These are stopping preferences disguised as conclusions; treat them as hard refusals.
 
-**v2.15 telos shift**: termination requires goal-progress evidence OR creative exhaustion (Frame-break Protocol fired without yielding a positive-EV route), NOT adversary-exhaustion alone. The loop's goal is goal-fulfillment, not attack-survival. Adversary mechanism is preserved (every round still runs adversary with nonce header per rule #11 + attack-class checklist), but adversary-exhausted no longer terminates by itself — it triggers Frame-break Protocol, which is the LLM's creative-escape opportunity.
+**Telos**: termination requires goal-progress evidence OR creative exhaustion (Frame-break Protocol fired without positive-EV route), NOT peer-challenge-exhaustion alone. Goal is goal-fulfillment, not attack-survival. Peer challenge mechanism preserved (every round still runs with nonce header per rule #11 + attack-class checklist); challenge-exhausted no longer terminates — triggers Frame-break.
 
 Valid termination conditions (v2.15, K=2 default for frame-break exhaustion threshold):
 
@@ -1437,72 +1145,22 @@ Adversary-exhaustion is **necessary but not sufficient** for termination. The lo
 
 **Key inversion:** when execution is in the loop, the abelian structure becomes MORE valuable, not less — adversary now has two surfaces (code logic + actual output), mutation is verifiable via git, portfolio cells produce real numbers. Spec-only mode is the corner case; executable mode is the bedrock.
 
-## Migration: v2.x → v3.0
+## Migration
 
-v3.0 collapses the mode lexicon. Legacy flags warn + map; legacy
-header reads accepted; behavior unified.
+v2.x → v3.0 deprecation map: see [MIGRATION.md](MIGRATION.md).
 
-### Flag deprecations
+Brief legacy flag map (loop emits stderr warning + writes `escalations.md` per deprecated flag observed):
 
-| v2.x flag | v3.0 behavior |
+| v2.x | v3.0 |
 |---|---|
-| `--mode=co-research` | DEPRECATED no-op (warn). Co-research IS the loop in v3.0; no flag needed. |
-| `--mode=unilateral` | DEPRECATED warn + EXIT non-zero. v3.0 has no unilateral mode. Reroute to a different review tool for single-axis verification (abelian's "When abelian does NOT fit" positioning preserved). |
-| `--adversary=dissect` | DEPRECATED warn + map → `--peers=claude+claude` (Claude Code default) or `--peers=codex+codex` (codex CLI default) |
-| `--adversary=codex` | DEPRECATED warn + map → `--peers=claude+codex` |
-| `--adversary=both` | DEPRECATED warn + map → `--peers=claude+codex` AND `--code-review=on` (rule #12 supplemental gate). True 3-peer N>2 architecture is v4 territory. |
-| `--adversary=off` | REFUSED. abelian without peer challenge is not abelian. |
-| `abelian sharpen "<mission>"` (subcommand) | DEPRECATED. Replace with `abelian --mission "<text>"` flag. |
+| `--mode=co-research` | warn + no-op |
+| `--mode=unilateral` | warn + EXIT (use a different review tool) |
+| `--adversary=dissect/codex` | warn + map → `--peers=` |
+| `--adversary=both` | warn + map → `--peers=claude+codex` + `--code-review=on` |
+| `--adversary=off` | REFUSED |
+| `abelian sharpen "..."` | warn + map → `abelian --mission "..."` |
 
-Loop emits clear warning to stderr + writes to `escalations.md` for
-every deprecated flag observed. Mapping happens once at startup.
-
-### Header deprecation
-
-| Header magic | v3.0 behavior |
-|---|---|
-| `ABELIAN-PEER-v1` | Preferred. Emitted by all v3.0 peer challenges. |
-| `ABELIAN-ADV-v1` | Legacy. Commit-gate accepts during deprecation window for archived v2.x runs being resumed. New peer calls MUST emit PEER-v1. |
-
-After v3.x.y minor versions (target: v3.2), legacy `ABELIAN-ADV-v1`
-acceptance removed; runs with that header become inaccessible for
-resume (must be archived).
-
-### File layout deprecation
-
-| Path | v3.0 behavior |
-|---|---|
-| `$RUN_DIR/round-N/peer-A.txt` + `peer-B.txt` | Preferred. All v3.0 runs produce these. |
-| `$RUN_DIR/round-N/adversary.txt` | Legacy from v2.x unilateral mode. Read-only acceptance for resume of archived runs; not produced. |
-
-### What stayed the same
-
-- All commit-gate checks 1-11 (now 1-11+12 with rule #18 propose-grounding extension to check 8)
-- All program.md schema (Goal/Target/Eval/Eval ground/Metric/Constraints/Strategy/Cells/Attack Classes/Takeaway)
-- All state.json structure (rounds[], round_0, sharpening, frame_break_count_consecutive — keys unchanged)
-- All terminology of `program.md`, `Eval`, `Metric.tolerance`, `Takeaway.Validated_by`
-- Frame-break Protocol 5-step sequence
-- Rule #16 round-0 hard checklist clauses (Goal measurable noun, Strategy ≥2 axes [unless single-axis triage + --mode=unilateral... wait, we deprecated --mode]) — see v3.0 amendment below
-
-### Rule #16 A v3.0 amendment to v2.17 single-axis exception
-
-The v2.17 rule #16 A exception said `Strategy=1 IFF single-axis triage
-AND --mode=unilateral`. With v3.0 dropping unilateral mode, the
-exception updates to:
-
-```
-Strategy ≥2 axes UNLESS state.sharpening.triage_classification = "single-axis"
-AND program.md draft is launched with --peers=<config> known to handle
-single-axis (currently: rejected — v3.0 routes single-axis to a
-different review tool, since abelian's diversity engine has no value
-on single-axis tasks).
-```
-
-In practice, v3.0 sharpening Pass 0 triage classifying `single-axis`
-exits with diagnostic "Mission is single-axis verification; abelian's
-diversity engine has no value here. Use a separate review tool."
-This is stricter than v2.17 (which produced Strategy=1 + recommended
-unilateral); v3.0 honest exit instead of degraded run.
+Header `ABELIAN-ADV-v1` legacy-readable; new peer calls emit only `ABELIAN-PEER-v1`. Removed in v3.2.
 
 ## Safety Rules
 
