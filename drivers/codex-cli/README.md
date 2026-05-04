@@ -16,7 +16,7 @@ Wrap as alias if running often. Prompt is intentionally inlined — codex sees p
 
 ## Codex skill discovery
 
-For Codex environments that scan `~/.codex/skills`, use the installer instead of symlinking the repo root:
+For Codex environments that scan `~/.agents/skills`, use the installer instead of symlinking the repo root:
 
 ```bash
 git clone https://github.com/Abel-ai-causality/abelian.git ~/abelian
@@ -25,7 +25,7 @@ bash ~/abelian/integrations/codex/install.sh
 
 Restart Codex so the skill list reloads.
 
-The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter. The installer generates a Codex-compatible `SKILL.md`, copies runtime support files (`INVARIANTS.md`, `prompts/dissect.md`, `agents/openai.yaml`) into `${CODEX_HOME:-$HOME/.codex}/skills/.generated/abelian`, then symlinks `${CODEX_HOME:-$HOME/.codex}/skills/abelian` to that generated package.
+The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter. The installer generates a Codex-compatible `SKILL.md`, copies runtime support files (`INVARIANTS.md`, `prompts/dissect.md`, `agents/openai.yaml`) into `${SKILLS_HOME:-${AGENTS_HOME:-$HOME/.agents}/skills}/.generated/abelian`, then symlinks `${SKILLS_HOME:-${AGENTS_HOME:-$HOME/.agents}/skills}/abelian` to that generated package. Set `SKILLS_HOME=/path/to/.agents/skills` for a repo-local install.
 
 ## What codex does
 

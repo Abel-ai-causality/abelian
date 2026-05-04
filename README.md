@@ -104,7 +104,7 @@ Details: [drivers/codex-cli/README.md](drivers/codex-cli/README.md).
 git clone https://github.com/Abel-ai-causality/abelian.git ~/abelian
 bash ~/abelian/integrations/codex/install.sh
 ```
-Restart Codex after installing. Do not symlink the repo root into `~/.codex/skills`; the installer generates a Codex-clean skill package from the canonical repo files and symlinks `~/.codex/skills/abelian` to it.
+Restart Codex after installing. Do not symlink the repo root into a skills directory; the installer generates a Codex-clean skill package from the canonical repo files and symlinks `~/.agents/skills/abelian` to it. Override with `SKILLS_HOME=/path/to/.agents/skills` for a repo-local install.
 
 ## program.md skeleton
 

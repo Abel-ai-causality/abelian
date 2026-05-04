@@ -2,9 +2,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-codex_home="${CODEX_HOME:-$HOME/.codex}"
-generated_dir="$codex_home/skills/.generated/abelian"
-skill_link="$codex_home/skills/abelian"
+skills_home="${SKILLS_HOME:-${AGENTS_HOME:-$HOME/.agents}/skills}"
+generated_dir="$skills_home/.generated/abelian"
+skill_link="$skills_home/abelian"
 
 required=(
   "$repo_root/SKILL.md"
@@ -21,7 +21,7 @@ for path in "${required[@]}"; do
 done
 
 rm -rf "$generated_dir"
-mkdir -p "$generated_dir/agents" "$generated_dir/prompts" "$(dirname "$skill_link")"
+mkdir -p "$generated_dir/agents" "$generated_dir/prompts" "$skills_home"
 
 {
   cat <<'YAML'
