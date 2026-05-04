@@ -12,7 +12,7 @@ Codex-discoverable entrypoint. Canonical protocol files live in the upstream `Ab
 In order:
 
 1. Use `$ABELIAN_HOME` if set.
-2. Resolve the parent repo of this skill (follow symlinks if installed at `~/.codex/skills/abelian`).
+2. Resolve the parent repo of this skill (follow symlinks if installed at `~/.agents/skills/abelian` or any other Codex skill discovery path — see [`drivers/codex-cli/README.md`](../../README.md)).
 3. Ask the user for the abelian checkout path.
 
 The checkout must contain `SKILL.md`, `INVARIANTS.md`, `prompts/dissect.md`. If any is missing, stop and tell the user.

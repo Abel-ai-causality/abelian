@@ -16,17 +16,19 @@ Wrap as alias if running often. Prompt is intentionally inlined — codex sees p
 
 ## Codex skill discovery
 
-For Codex environments that scan `~/.codex/skills`, install the wrapper at [`skills/abelian/`](skills/abelian/SKILL.md) instead of symlinking the repo root:
+Codex auto-scans `.agents/skills/` at four levels in priority order: `$CWD/.agents/skills`, `$CWD/../.agents/skills`, `$REPO_ROOT/.agents/skills`, then user-level `$HOME/.agents/skills`. (Source: [Codex skills docs](https://developers.openai.com/codex/skills).) Install the wrapper at [`skills/abelian/`](skills/abelian/SKILL.md) into the user-level path:
 
 ```bash
 export ABELIAN_HOME=~/abelian
-mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-ln -s "$ABELIAN_HOME/drivers/codex-cli/skills/abelian" "${CODEX_HOME:-$HOME/.codex}/skills/abelian"
+mkdir -p "$HOME/.agents/skills"
+ln -s "$ABELIAN_HOME/drivers/codex-cli/skills/abelian" "$HOME/.agents/skills/abelian"
 ```
 
-Restart Codex so the skill list reloads.
+Restart Codex so the skill list reloads. Folder-level symlinks under `.agents/skills/<name>/` are supported (per openai/codex#11314); do **not** symlink only `SKILL.md` (file-level symlinks are dropped per openai/codex#17344) and do **not** symlink `.agents/skills` itself (top-level dir symlinks are skipped per the same bug).
 
-The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter (and is large — 502 lines post-razor); the wrapper exposes a Codex-clean entrypoint that resolves `$ABELIAN_HOME` and delegates to canonical files.
+Repo-local install (project-scoped instead of user-scoped) works the same way: `ln -s "$ABELIAN_HOME/drivers/codex-cli/skills/abelian" .agents/skills/abelian` from your target project root.
+
+The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter (502 lines post-razor); the wrapper exposes a Codex-clean entrypoint that resolves `$ABELIAN_HOME` and delegates to canonical files.
 
 ## What codex does
 
