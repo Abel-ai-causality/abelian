@@ -99,6 +99,13 @@ Run abelian on program.md per spec. Maintain state.json under abelian/runs/<RUN_
 ```
 Details: [drivers/codex-cli/README.md](drivers/codex-cli/README.md).
 
+**Codex skill discovery**:
+```bash
+git clone https://github.com/Abel-ai-causality/abelian.git ~/abelian
+bash ~/abelian/integrations/codex/install.sh
+```
+Restart Codex after installing. Do not symlink the repo root into a skills directory; the installer generates a Codex-clean skill package from the canonical repo files and symlinks `~/.agents/skills/abelian` to it. Override with `SKILLS_HOME=/path/to/.agents/skills` for a repo-local install.
+
 ## program.md skeleton
 
 ```markdown

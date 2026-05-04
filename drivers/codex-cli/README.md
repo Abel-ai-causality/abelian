@@ -14,6 +14,19 @@ Run abelian on program.md per the spec above. Maintain state.json under abelian/
 
 Wrap as alias if running often. Prompt is intentionally inlined — codex sees protocol verbatim, no abstraction.
 
+## Codex skill discovery
+
+For Codex environments that scan `~/.agents/skills`, use the installer instead of symlinking the repo root:
+
+```bash
+git clone https://github.com/Abel-ai-causality/abelian.git ~/abelian
+bash ~/abelian/integrations/codex/install.sh
+```
+
+Restart Codex so the skill list reloads.
+
+The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter. The installer generates a Codex-compatible `SKILL.md`, copies runtime support files (`INVARIANTS.md`, `prompts/dissect.md`, `agents/openai.yaml`) into `${SKILLS_HOME:-${AGENTS_HOME:-$HOME/.agents}/skills}/.generated/abelian`, then symlinks `${SKILLS_HOME:-${AGENTS_HOME:-$HOME/.agents}/skills}/abelian` to that generated package. Set `SKILLS_HOME=/path/to/.agents/skills` for a repo-local install.
+
 ## What codex does
 
 Becomes mutator + orchestrator. Per-round flow lives in [`SKILL.md`](../../SKILL.md) sections "The Loop" / "Round-0 Authoring Gate" / "Frame-break Protocol" — codex executes that spec.
