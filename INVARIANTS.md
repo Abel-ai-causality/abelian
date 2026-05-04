@@ -485,7 +485,7 @@ Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate. Missi
   "candidate_routes": [             // ≥2 entries; single-route = gate-fail
     { "id": str, "mechanism": str, "est_metric_delta": float | "unknown",
       "est_cost": "cheap | medium | expensive", "blocker_chain": str | null,
-      grounding: "file path + line range | command + actual output | quoted text + source" }
+      "grounding": "file path + line range | command + actual output | quoted text + source" }
   ],
   "selected_route_id": str,         // matches a candidate_routes entry
   "selection_reason": str,          // MUST cite ≥1 unpicked route's trade-off by id

@@ -48,7 +48,7 @@ if [ -f "$INVARIANTS" ]; then
   # Both schemas in same file; we look for "grounding" appearing within the
   # rule #11 alternative_routes schema block AND within the rule #14
   # candidate_routes schema block. We use line counts as a coarse signal.
-  GROUNDING_HITS=$(grep -c '^[[:space:]]*grounding:' "$INVARIANTS" || true)
+  GROUNDING_HITS=$(grep -cE '^[[:space:]]*"?grounding"?[[:space:]]*:' "$INVARIANTS" || true)
   if [ "$GROUNDING_HITS" -ge 2 ]; then
     PASS=$((PASS+1))
   else
