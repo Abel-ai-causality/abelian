@@ -14,6 +14,20 @@ Run abelian on program.md per the spec above. Maintain state.json under abelian/
 
 Wrap as alias if running often. Prompt is intentionally inlined — codex sees protocol verbatim, no abstraction.
 
+## Codex skill discovery
+
+For Codex environments that scan `~/.codex/skills`, install the wrapper at [`skills/abelian/`](skills/abelian/SKILL.md) instead of symlinking the repo root:
+
+```bash
+export ABELIAN_HOME=~/abelian
+mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
+ln -s "$ABELIAN_HOME/drivers/codex-cli/skills/abelian" "${CODEX_HOME:-$HOME/.codex}/skills/abelian"
+```
+
+Restart Codex so the skill list reloads.
+
+The repo-root `SKILL.md` is the upstream protocol with harness-specific frontmatter (and is large — 502 lines post-razor); the wrapper exposes a Codex-clean entrypoint that resolves `$ABELIAN_HOME` and delegates to canonical files.
+
 ## What codex does
 
 Becomes mutator + orchestrator. Per-round flow lives in [`SKILL.md`](../../SKILL.md) sections "The Loop" / "Round-0 Authoring Gate" / "Frame-break Protocol" — codex executes that spec.
