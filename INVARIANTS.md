@@ -332,6 +332,7 @@ evidence_class: theoretical | paper | replay | settled | dry_run | live
   - id: <slug>
     mechanism: <one-line description>
     est_metric_delta: <float | "unknown">
+    grounding: <file path + line range | command + actual output | quoted text + source>
     rationale: <why peer would consider this>
 ```
 
@@ -466,7 +467,7 @@ the user to run co-research peer manually.
 
 Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate. Missing/incomplete = commit-gate check 8 fails = revert.
 
-```json
+```text
 "mission_thread": {
   "goal_paraphrase": str,           // fresh paraphrase, MUST differ from prior round
   "metric_delta": float | null,     // null requires exploration_round=true
@@ -474,7 +475,8 @@ Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate. Missi
   "mission_relevance": str,         // one sentence; cites Takeaway.Validated_by if rule #16 active
   "candidate_routes": [             // ≥2 entries; single-route = gate-fail
     { "id": str, "mechanism": str, "est_metric_delta": float | "unknown",
-      "est_cost": "cheap | medium | expensive", "blocker_chain": str | null }
+      "est_cost": "cheap | medium | expensive", "blocker_chain": str | null,
+      grounding: "file path + line range | command + actual output | quoted text + source" }
   ],
   "selected_route_id": str,         // matches a candidate_routes entry
   "selection_reason": str,          // MUST cite ≥1 unpicked route's trade-off by id
