@@ -352,12 +352,12 @@ evidence_class: theoretical | paper | replay | settled | dry_run | live
 ## 12. Code Review supplemental gate (opt-in, v2.11+)
 
 program.md `Code review: on` enables an additional code-quality review layer that
-runs **after** rule #1's dissect/codex adversary call and **before**
+runs **after** rule #1's peer challenge call and **before**
 rule #2's commit-gate. It uses codex CLI's purpose-built `codex review`
 subcommand (with its built-in P1/P2/P3 severity schema) — separate from
-and supplemental to rule #1's domain-specific attack-class adversary.
+and supplemental to rule #1's domain-specific peer challenge.
 
-**Why supplemental, not replacement**: dissect adversary covers
+**Why supplemental, not replacement**: peer challenge covers
 domain-specific attack classes the program.md author defined (e.g.
 "correctness must match O(N²) baseline", "integer-overflow at N=4M").
 codex review covers code-quality issues codex's built-in prompt is
@@ -492,11 +492,12 @@ Every round populates `state.rounds[N].mission_thread` BEFORE commit-gate. Missi
 
 **Why**: without per-round goal-anchor, attacks become self-justifying ("passed all classes → commit") regardless of mission progress. Mission Thread makes goal-relevance a structural per-round artifact. Rule #2 check 10 reverts rounds with `metric_delta=0 AND blocker=n/a AND exploration=false`.
 
-## 15. Evidence Class enum in adversary header (v2.15)
+## 15. Evidence Class enum in peer header (v2.15)
 
-Every `adversary.txt` (and `peer-A.txt` / `peer-B.txt`) header block
-MUST include an `evidence_class:` line with value in the v15 whitelist
-(see rule #11 schema for full enum).
+Every `peer-A.txt` / `peer-B.txt` header block MUST include an
+`evidence_class:` line with value in the v15 whitelist (see rule #11
+schema for full enum). Legacy `adversary.txt` headers accepted during
+the deprecation window follow the same requirement.
 
 **Why**: prior versions did not require evidence-class disambiguation,
 so a round could pass attack-class checks based on theoretical analysis
