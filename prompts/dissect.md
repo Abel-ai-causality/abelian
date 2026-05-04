@@ -62,7 +62,7 @@ Legacy `ABELIAN-ADV-v1` header is read-only-accepted during deprecation window; 
 
 After `---`, list each Attack Class number + criterion-4 attack-or-`n/a` evidence.
 
-Optional after attacks (informational, non-binding): `alternative_routes:` block listing routes you'd consider if asked to propose. Each entry: `id`, `mechanism` (one line), `est_metric_delta` (float or `unknown`), `rationale`. The next round's peers may mine these for `mission_thread.candidate_routes` (rule #14 reject-pool mining + Frame-break Protocol step 5).
+Optional after attacks (informational, non-binding): `alternative_routes:` block listing routes you'd consider if asked to propose. Each entry: `id`, `mechanism` (one line), `est_progress_delta` (float or `unknown`), `rationale`. The next round's peers may mine these for `mission_thread.candidate_routes` (rule #14 reject-pool mining + Frame-break Protocol step 5).
 
 ## Return value
 

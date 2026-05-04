@@ -9,7 +9,7 @@ In your project (must be a git repo with `.gitignore` covering build artifacts �
 ```bash
 codex exec -s workspace-write "$(cat ~/abelian/SKILL.md ~/abelian/INVARIANTS.md ~/abelian/prompts/dissect.md)
 
-Run abelian on program.md per the spec above. Maintain state.json under abelian/runs/<RUN_ID>/. Run till mechanism-based converge per INVARIANTS rule #6 (no rounds cap, no budget cap). Default peers = codex × codex with different context-framing at full max-effort; peer challenges run as fresh codex exec subprocesses. Abort: Ctrl+C → status=interrupted."
+Run abelian on program.md per the spec above. Maintain state.json under abelian/runs/<RUN_ID>/. Run till mechanism-based converge per INVARIANTS rule #6 (no rounds cap, no budget cap). Default peers = codex × codex with different context-framing at full max-effort; if Codex has no native multi-agent, peer-A and peer-B are fresh codex exec subprocesses (parallel when possible, sequential is acceptable). Abort: Ctrl+C → status=interrupted."
 ```
 
 Wrap as alias if running often. Prompt is intentionally inlined — codex sees protocol verbatim, no abstraction.
@@ -18,7 +18,9 @@ Wrap as alias if running often. Prompt is intentionally inlined — codex sees p
 
 Becomes mutator + orchestrator. Per-round flow lives in [`SKILL.md`](../../SKILL.md) sections "The Loop" / "Round-0 Authoring Gate" / "Frame-break Protocol" — codex executes that spec.
 
-Mechanics: codex maintains `state.json` via `jq`, generates nonces via `python3 -c "import secrets; ..."`, runs git ops directly, dispatches peer subagents via fresh `codex exec` subprocesses (rule #11 nonce header inherited).
+Mechanics: codex maintains `state.json` via `jq`, generates nonces via `python3 -c "import secrets; ..."`, runs git ops directly, dispatches peer subagents via fresh `codex exec` subprocesses (rule #11 nonce header inherited). Parent codex is orchestrator only; it must not synthesize peer artifacts.
+
+Isolation gate: PROPOSE/IMPLEMENT peers may write only their own branch/worktree and `$RUN_DIR/round-N/peer-<slot>/`; CHALLENGE peers may write only `$RUN_DIR/round-N/peer-<slot>.txt`. After each subprocess returns, codex checks the dirty set; any write outside the allowed paths gate-fails that candidate or challenge.
 
 ## Code Review supplemental gate
 

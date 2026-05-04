@@ -41,11 +41,11 @@ Per round:
 4. Cross-attack  peer-A → peer-B, peer-B → peer-A
                  round-N/peer-{A,B}.txt with ABELIAN-PEER-v1 header (rule #11)
 5. Verify     each attack converts to a probe; fail = revert that branch
-6. Champion   best surviving metric wins; loser preserved for inspiration
+6. Champion   best surviving progress_delta wins; loser preserved for inspiration
 7. Inspire    each peer reads other's mutation + attacks; feeds R+1
 8. Converge?  goal-met / no-proposal-after-K-frame-breaks / mutual-KILL
-              if "stuck" (adversary-exhausted OR metric stalled OR all
-              candidate_routes ≤0), fire Frame-break Protocol (5-step
+              if "stuck" (challenge-clean OR progress stalled OR all
+              candidate_routes progress ≤0), fire Frame-break Protocol (5-step
               creative escape) BEFORE termination claim
 ```
 
@@ -57,7 +57,7 @@ Single-axis verification (typo fix, single-axis verify, ship-prep against known 
 
 | # | Rule | Notes |
 |---|---|---|
-| 1 | Adversary output on disk | not conversation context |
+| 1 | Peer challenge output on disk | not conversation context |
 | 2 | Commit-gate (10 always-on + 1 conditional) | peer files / nonce / mtime / verdict / drift / pre-files / eval / mission_thread (#14) / evidence_class (#15) / goal-progress (#14); +codex-review when program.md `Code review: on` |
 | 3 | Per-round refresh | cat INVARIANTS.md + state.json |
 | 4 | Drift check | expected_head + branch + dirty-tree before any commit/revert. v2.16 distinguishes `contract-drift-stopped` (rule #16 hash mismatch) from ordinary `drift-stopped` |
@@ -65,7 +65,7 @@ Single-axis verification (typo fix, single-axis verify, ship-prep against known 
 | 6 | Forbidden termination rationales | 5 stopping-preferences refused. Valid: `goal-met / no-proposal-after-K-frame-breaks / mutual-KILL / interrupted` |
 | 7 | Verbatim Goal/Target/Constraints | in adversary prompts (no paraphrase) |
 | 8 | Self-judge discipline | concrete-ground (code) or fuzzy-ground (doc/research/audit/decision) per `Eval ground:`; v3.0 has no off-switch for peer challenge (always required) |
-| 9 | Execution gate | adversary-exhaustion alone insufficient |
+| 9 | Execution gate | peer silence alone insufficient |
 | 10 | Production-runtime safety | cron/supervisor/watchdog edits need extra discipline |
 | 11 | Peer challenge header block | `ABELIAN-PEER-v1` + nonce + timestamp + `evidence_class:`. Peers may add informational `alternative_routes:` after attacks. (v3.0 rename from `ABELIAN-ADV-v1`; legacy double-read during deprecation) |
 | 12 | Code Review supplemental gate | opt-in via program.md `Code review: on`; refuse on `[P1]`/`[P2]` |
@@ -147,6 +147,8 @@ python3 bench.py | tail -1
 ```
 
 Default peers auto-detected from driver (`claude+claude` Claude Code; `codex+codex` codex CLI). Cross-family `claude+codex`, search shape (chains/depth/candidates/portfolio), code-review supplemental — all declared in program.md (no CLI flags). Fuzzy mission: `abelian --mission "<text>"`. Mechanism-based termination per rule #6 (no rounds/budget/wallclock cap). Manual abort: SIGINT. Legacy v2.x flags deprecated → see [MIGRATION.md](MIGRATION.md).
+
+Progress is direction-normalized: `max` metrics improve when they rise; `min` metrics improve when they fall. Champion selection and frame-break gates use `progress_delta`, not raw metric delta.
 
 ## Version
 
