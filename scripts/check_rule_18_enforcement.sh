@@ -45,15 +45,24 @@ fi
 # Pass criterion: BOTH schemas contain a `grounding` field line.
 # ---------------------------------------------------------------------------
 if [ -f "$INVARIANTS" ]; then
-  # Both schemas in same file; we look for "grounding" appearing within the
-  # rule #11 alternative_routes schema block AND within the rule #14
-  # candidate_routes schema block. We use line counts as a coarse signal.
-  GROUNDING_HITS=$(grep -cE '^[[:space:]]*"?grounding"?[[:space:]]*:' "$INVARIANTS" || true)
-  if [ "$GROUNDING_HITS" -ge 2 ]; then
+  # Verify grounding appears in BOTH schema sections, not just total count.
+  RULE11_BLOCK=$(awk '/^## 11\./,/^## 12\./' "$INVARIANTS")
+  RULE14_BLOCK=$(awk '/^## 14\./,/^## 15\./' "$INVARIANTS")
+  RULE11_GROUNDING=0
+  RULE14_GROUNDING=0
+
+  if echo "$RULE11_BLOCK" | grep -qiE 'grounding[^[:alnum:]_]*:'; then
+    RULE11_GROUNDING=1
+  fi
+  if echo "$RULE14_BLOCK" | grep -qiE 'grounding[^[:alnum:]_]*:'; then
+    RULE14_GROUNDING=1
+  fi
+
+  if [ "$RULE11_GROUNDING" -eq 1 ] && [ "$RULE14_GROUNDING" -eq 1 ]; then
     PASS=$((PASS+1))
   else
     FAIL_REASONS="$FAIL_REASONS
-[axis2 schema] INVARIANTS.md needs grounding: field in both candidate_routes and alternative_routes schemas (found $GROUNDING_HITS, need ≥2)"
+[axis2 schema] INVARIANTS.md needs grounding: field in both candidate_routes and alternative_routes schemas (rule11=$RULE11_GROUNDING, rule14=$RULE14_GROUNDING)"
   fi
 else
   FAIL_REASONS="$FAIL_REASONS
@@ -139,7 +148,7 @@ if [ -f "$SKILL" ]; then
     # Pass if the block mentions: configured peer / peer family / Agent /
     # claude+claude / OR has a "codex unavailable" / "skip if" guard.
     if echo "$LIVING_SPEC" | grep -qiE 'configured peer|peer.family|Agent\(|claude\+claude|claude\+codex|codex unavailable|skip if|guard|fallback' \
-       && ! echo "$LIVING_SPEC" | grep -qE '^\s*dispatch codex with:\s*$'; then
+       && ! echo "$LIVING_SPEC" | grep -qE '^[[:space:]]*dispatch codex with:[[:space:]]*$'; then
       # The negative check ensures the unconditional "dispatch codex with:" line is gone
       # (replaced with peer-aware language). The positive checks ensure the block
       # references the new mechanism.
