@@ -1,8 +1,18 @@
 # Abelian
 
-Adversarial collaboration loop for deep + innovative + long-horizon LLM iteration. **One skill, one loop, one discipline**: every configured peer (default 2) proposes AND attacks every other peer's proposals. 18 INVARIANTS. Mechanism-converge termination. Goal-authoring is a stage of the same loop (auto-detected from `--mission` flag), not a separate mode.
+> **Most multi-agent LLM frameworks ship. Abelian disciplines.**
 
-Output = tractable doc + testable metric. Tasks without testable metric → use `ce-brainstorm`.
+![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-v3.0.0-green) ![status](https://img.shields.io/badge/status-production--ready-brightgreen) ![inspired-by](https://img.shields.io/badge/inspired%20by-Kahneman%20%2B%20Karpathy-purple)
+
+|                       | Naive multi-agent | LangGraph / CrewAI | **Abelian**                        |
+|---|---|---|---|
+| Peer falsification    | None              | Optional           | **Mandated (rule #18)**            |
+| Termination           | Round budget      | Round budget       | **Mechanism-converge (rule #6)**   |
+| Self-judge bias       | Unaddressed       | Unaddressed        | **Schema-grounded (rule #8 v2.2)** |
+| Stuck → next move     | Manual            | Manual             | **Frame-break Protocol (5-step)**  |
+| Receipts in real runs | —                 | —                  | **public run notes + companion skill ship** |
+
+> Your multi-agent LLM team agrees because they're trained on the same data. We made them falsify each other instead. **18** INVARIANTS, **mechanism-converge** termination, **schema-grounded** self-judge, **5-step** Frame-break Protocol. The discipline we run on our own research — and ship the receipts.
 
 ```
 ═══════════════════════════════════════════════════════════════
@@ -17,6 +27,52 @@ Output = tractable doc + testable metric. Tasks without testable metric → use 
 ═══════════════════════════════════════════════════════════════
 ```
 
+What you see above is one real abelian round. Two peers, two diffs, cross-attack, champion. Output = tractable doc + testable metric. Tasks without testable metric → use `ce-brainstorm`.
+
+## What's inside
+
+- **Asymmetric peer discipline** (rule #18) — PROPOSE mode innovates + grounds; COUNTER mode strictly probes (each attack converts to a runnable PASS/FAIL probe; argumentation without falsification target is forbidden).
+- **Attack Class Libraries** — default-7 + 4 named domain libraries (`research-class` / `audit-class` / `decision-class` / `doc-class`); cite by name in program.md, non-code tasks must opt into ≥1.
+- **Portfolio mode** (K > 1) — MAP-Elites-style Quality-Diversity. Objective shifts from "optimize one" to **"fill cells"** across behavior axes.
+- **Eval Discipline hierarchy** — level 1 (shell number) > level 2 (test pass/fail) > level 3 (frozen rubric self-judge) > level 4 (vibes — refused). Self-judge requires schema-grounding (rule #8 v2.2).
+- **Goal-authoring stage** (rule #17) — `abelian --mission "<fuzzy text>"` runs a 5-pass compiler from fuzzy mission to rule #16-compliant program.md draft.
+
+## TL;DR
+
+| Number | Plain English |
+|---|---|
+| **18** | Eighteen INVARIANTS hardening against agent-soup, fabrication, drift, propose/counter discipline asymmetry, and 14 other catalogued failure modes. |
+| **2** | Two stages (goal-authoring + loop), auto-detected from `--mission` flag. Sharp program.md skips the first; fuzzy mission triggers it. |
+| **4** | Four valid termination conditions (rule #6). Five forbidden stopping-preference rationales. Convergence is mechanism-backed or refused. |
+| **0** | Zero rounds/budget/wallclock caps. The loop runs until it converges. No timer-based stopping. |
+
+## 3 Takeaways
+
+- **Multi-agent LLM teams are agent-soup unless you mandate cross-falsification.** Two LLMs agreeing 30/30 can both be wrong about the same thing. Abelian forces propose AND attack between peers, with cross-family option to break the same-training-data prior.
+- **Adversarial collab without a falsification probe is just two LLMs vibing.** Rule #18 forbids argumentation without a runnable PASS/FAIL probe in COUNTER mode. Every attack must convert to a probe (regression test / benchmark / shell command / grep). Argumentation that can't be probed reverts the mutation.
+- **Mechanism-converge termination > round budgets.** Your loop should stop when it's *done*, not when the timer is up. Rule #6 hard-refuses 5 stopping-preference rationales ("diminishing returns", "time-remaining", "cleaner-to-ship", "deferred-future", "foundation-in-place"). Plateau triggers LLM creativity (Frame-break Protocol), not loop quit.
+
+## Bold Takes
+
+- **If your agent team has no falsification probe, you don't have a system — you have a vibe.**
+- **Multi-agent teams of correlation engines are just bigger correlation engines.**
+- **Kahneman wrote about adversarial collaboration in 2009. We made it executable in 2026.**
+- **Round budgets are vibe coding for loops. Mechanism-converge or your termination is rationalized.**
+
+## Reading Ladder
+
+- **30s**: Read the [Round 4 demo block](#abelian) at the top + the 3 takeaways above. You'll know if this fits your problem.
+- **5min**: Scan the [INVARIANTS table](#invariants-18) + the [program.md skeleton](#programmd-skeleton). You'll know how to author your first run.
+- **30min**: Install + author a program.md for a real problem (matmul example below). Run one round. Read a compound doc in `docs/solutions/`.
+
+## Reproduce In 3 Commands
+
+```bash
+git clone https://github.com/Abel-ai-causality/abelian.git ~/abelian
+cd ~/abelian
+bash integrations/codex/install.sh    # Codex CLI; for Claude Code see Install below
+```
+
 ## Fits / doesn't fit
 
 | Fits when | Doesn't fit when |
@@ -26,7 +82,7 @@ Output = tractable doc + testable metric. Tasks without testable metric → use 
 | Output is doc + testable anchor | Pure narrative without metric |
 | Domain has cross-attack surface | Pure metric without rationale to attack |
 
-Examples: speedup at non-obvious algorithm level, alpha research (sharpe + rationale), audit (rubric + review.md), architecture redesign (complexity metric + ADR), training-recipe search (eval loss + recipe.md).
+Examples: speedup at non-obvious algorithm level, alpha research (sharpe + rationale), audit (rubric + review.md), architecture redesign (complexity metric + ADR), training-recipe search (eval loss + recipe.md). Companion-repo runs include `viral-gtm-ai-startup` v1.1 framework extraction (run 2026-05-13-1958) and its refinement predecessor (run 2026-05-13-1832).
 
 ## Loop (co-research mode default)
 
@@ -157,18 +213,42 @@ Default peers auto-detected from driver (`claude+claude` Claude Code; `codex+cod
 
 Progress is direction-normalized: `max` metrics improve when they rise; `min` metrics improve when they fall. Champion selection and frame-break gates use `progress_delta`, not raw metric delta.
 
+## Receipts (what abelian has actually shipped)
+
+- **viral-gtm-ai-startup v1.1.0** — operator-grade launch playbook (https://github.com/Abel-ai-causality/viral-gtm-ai-startup). **138** candidate frameworks surveyed → **25** root-essential principle anchors + **12** institutional VC canon refs. Mock-equip walkthrough passed 8/8 mechanical gates. Built via 2 chained abelian runs (refine run 2026-05-13-1832 → build run 2026-05-13-1958).
+- **Multiple mechanical bugs caught at round-0 gates** during those runs — including fabricated citations (`First Round "Beyond Disruption"` wasn't a real article; `a16z16z.com` was a typo and the article title didn't resolve), `grep -c` line-hits-vs-distinct-count probe drift, and stale-reference holdovers in rubric thresholds.
+- **Polymarket alpha research, Round 1 (2026-04-22)** — 2 BLOCKER typos that self-judged 4/4 clean were immediately caught by codex SQL schema-grounding. The exact failure mode that motivated rule #8 v2.2 (schema-grounding required for self-judge).
+- **Compound docs auto-shipped** to `docs/solutions/` on every termination. Each run starts where the last one ended — `docs/solutions/<category>/<goal-slug>-<date>.md`.
+
+## Roadmap
+
+- **v3.0.0** (2026-05, current): one skill, one loop, one discipline. 18 INVARIANTS. Goal-authoring as stage. Cross-family peers (claude+codex). Mechanism-converge termination.
+- **v3.1.0** (planned): **chained-run pattern** — `program.md depends_on: <RUN_ID>` field, with loop verifying prior run's `state.status == completed` + champion artifact exists. Surfaced from real chained-run usage (viral-gtm-ai-startup build chain: 2026-05-13-1832 → 2026-05-13-1958).
+- **v3.2.0** (planned): **round-0 hardening** — pre-flight cite verification + probe arithmetic consistency check. Catches 4 categories of arithmetic bugs surfaced in real runs (`grep -c` line-hits vs distinct count, stale-reference drift, "all 4" lists with 5 items, etc.).
+- **v4.0.0** (planned): **mock-equip walkthrough** standardized as rule #9 doc-only execution-gate. Orchestrator clears mental state, loads ONLY champion artifact, simulates N synthetic scenarios with line-cited friction. Catches operational-usability gaps that cross-family peer rubric scoring can miss (the agent-soup risk inside the gate itself).
+- Submit ideas via [GitHub Issues](https://github.com/Abel-ai-causality/abelian/issues) or [Discussions](https://github.com/Abel-ai-causality/abelian/discussions).
+
+## Contributing / Questions
+
+- **Bug or broken probe?** Open an [issue](https://github.com/Abel-ai-causality/abelian/issues).
+- **Want a new INVARIANT?** Open a [discussion](https://github.com/Abel-ai-causality/abelian/discussions) with an **empirical anchor** — link a concrete failure mode the rule misses + grep-able trace from a real run. Speculative tightening without evidence is friction.
+- **Want to integrate with a new agent platform?** Open a discussion describing the driver pattern. New drivers live under `drivers/<name>/` as a `README.md` only — no wrapper scripts. Both shipped drivers (Claude Code, Codex CLI) are LLM-driven self-orchestration.
+- **Style**: terse, judgment-first. No hedging when a concrete claim works. Match the existing INVARIANTS prose density.
+
+Abelian is the methodology backbone for [viral-gtm-ai-startup](https://github.com/Abel-ai-causality/viral-gtm-ai-startup) (operator-grade launch playbook) and several Abel internal research pipelines. Real run artifacts live in `docs/solutions/`.
+
 ## Version
 
 Current: **v3.0.0** — one skill, one loop, one discipline. See `git log` or GitHub Releases for history.
 
-## Contributing
+## License + Citation
 
-INVARIANTS changes need an empirical anchor — link a concrete failure mode the rule misses. Speculative tightening is friction without evidence.
+MIT — see [LICENSE](LICENSE). Built on Kahneman's *adversarial collaboration* (2009), dissect-style attack-class taxonomy (`prompts/dissect.md`), Karpathy's "compound iteration loop" framing.
 
-New drivers under `drivers/<name>/`: `README.md` only, no wrapper scripts. Both shipped drivers are LLM-driven self-orchestration.
+Citation:
 
-Style: terse, judgment-first. No hedging when a concrete claim works.
-
-## License
-
-MIT — see [LICENSE](LICENSE). Built on Kahneman's *adversarial collaboration*, dissect-style attack-class taxonomy (`prompts/dissect.md`), Karpathy's "compound iteration loop" framing.
+```text
+Stephen (cauchyturing), Abel AI Lab.
+abelian v3.0.0: adversarial collaboration loop for deep + innovative + long-horizon LLM iteration. 2026.
+https://github.com/Abel-ai-causality/abelian
+```
