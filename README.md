@@ -10,7 +10,7 @@
 | Termination           | Round budget      | Round budget       | **Mechanism-converge (rule #6)**   |
 | Self-judge bias       | Unaddressed       | Unaddressed        | **Schema-grounded (rule #8 v2.2)** |
 | Stuck → next move     | Manual            | Manual             | **Frame-break Protocol (5-step)**  |
-| Receipts in real runs | —                 | —                  | **6 gate-catches / 1 skill shipped** |
+| Receipts in real runs | —                 | —                  | **public run notes + companion skill ship** |
 
 > Your multi-agent LLM team agrees because they're trained on the same data. We made them falsify each other instead. **18** INVARIANTS, **mechanism-converge** termination, **schema-grounded** self-judge, **5-step** Frame-break Protocol. The discipline we run on our own research — and ship the receipts.
 
@@ -43,7 +43,7 @@ What you see above is one real abelian round. Two peers, two diffs, cross-attack
 |---|---|
 | **18** | Eighteen INVARIANTS hardening against agent-soup, fabrication, drift, propose/counter discipline asymmetry, and 14 other catalogued failure modes. |
 | **2** | Two stages (goal-authoring + loop), auto-detected from `--mission` flag. Sharp program.md skips the first; fuzzy mission triggers it. |
-| **5** | Five valid termination conditions (rule #6). Five forbidden stopping-preference rationales. Convergence is mechanism-backed or refused. |
+| **4** | Four valid termination conditions (rule #6). Five forbidden stopping-preference rationales. Convergence is mechanism-backed or refused. |
 | **0** | Zero rounds/budget/wallclock caps. The loop runs until it converges. No timer-based stopping. |
 
 ## 3 Takeaways
@@ -82,7 +82,7 @@ bash integrations/codex/install.sh    # Codex CLI; for Claude Code see Install b
 | Output is doc + testable anchor | Pure narrative without metric |
 | Domain has cross-attack surface | Pure metric without rationale to attack |
 
-Examples: speedup at non-obvious algorithm level, alpha research (sharpe + rationale), audit (rubric + review.md), architecture redesign (complexity metric + ADR), training-recipe search (eval loss + recipe.md). Real runs in `docs/solutions/skills/` include `viral-gtm-ai-startup` v1.1 framework extraction (run 2026-05-13-1958) and the refined-proposal it descended from (run 2026-05-13-1832).
+Examples: speedup at non-obvious algorithm level, alpha research (sharpe + rationale), audit (rubric + review.md), architecture redesign (complexity metric + ADR), training-recipe search (eval loss + recipe.md). Companion-repo runs include `viral-gtm-ai-startup` v1.1 framework extraction (run 2026-05-13-1958) and its refinement predecessor (run 2026-05-13-1832).
 
 ## Loop (co-research mode default)
 
@@ -215,8 +215,8 @@ Progress is direction-normalized: `max` metrics improve when they rise; `min` me
 
 ## Receipts (what abelian has actually shipped)
 
-- **viral-gtm-ai-startup v1.1.0** — operator-grade launch playbook (https://github.com/Abel-ai-causality/viral-gtm-ai-startup). **138** candidate frameworks surveyed → **25** root-essential principle anchors + **12** institutional VC canon refs. Mock-equip walkthrough passed 8/8 mechanical gates. Built via 2 chained abelian runs (`docs/solutions/skills/viral-gtm-ai-startup-build-2026-05-13.md` chained from `viral-gtm-ai-startup-refine-2026-05-13.md`).
-- **6 mechanical bugs caught at round-0 gates** during those runs — including fabricated citations (`First Round "Beyond Disruption"` wasn't a real article; `a16z16z.com` was a typo and the article title didn't resolve), `grep -c` line-hits-vs-distinct-count probe drift, and stale-reference holdovers in rubric thresholds. Each catch is in the run's `program-peer-challenge-v{N}.txt` artifact.
+- **viral-gtm-ai-startup v1.1.0** — operator-grade launch playbook (https://github.com/Abel-ai-causality/viral-gtm-ai-startup). **138** candidate frameworks surveyed → **25** root-essential principle anchors + **12** institutional VC canon refs. Mock-equip walkthrough passed 8/8 mechanical gates. Built via 2 chained abelian runs (refine run 2026-05-13-1832 → build run 2026-05-13-1958).
+- **Multiple mechanical bugs caught at round-0 gates** during those runs — including fabricated citations (`First Round "Beyond Disruption"` wasn't a real article; `a16z16z.com` was a typo and the article title didn't resolve), `grep -c` line-hits-vs-distinct-count probe drift, and stale-reference holdovers in rubric thresholds.
 - **Polymarket alpha research, Round 1 (2026-04-22)** — 2 BLOCKER typos that self-judged 4/4 clean were immediately caught by codex SQL schema-grounding. The exact failure mode that motivated rule #8 v2.2 (schema-grounding required for self-judge).
 - **Compound docs auto-shipped** to `docs/solutions/` on every termination. Each run starts where the last one ended — `docs/solutions/<category>/<goal-slug>-<date>.md`.
 
