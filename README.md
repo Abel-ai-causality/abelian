@@ -1,8 +1,18 @@
 # Abelian
 
-> If your AI agent team agrees on everything, you don't have a team. You have a chorus. **Abelian** makes peers propose AND falsify each other — each attack converts to a runnable PASS/FAIL probe. **18 INVARIANTS** hardening against fabrication, drift, sycophancy. One loop. Mechanism-converge termination. The discipline we use on our own research.
+> **Most multi-agent LLM frameworks ship. Abelian disciplines.**
 
 ![license](https://img.shields.io/badge/license-MIT-blue) ![version](https://img.shields.io/badge/version-v3.0.0-green) ![status](https://img.shields.io/badge/status-production--ready-brightgreen) ![inspired-by](https://img.shields.io/badge/inspired%20by-Kahneman%20%2B%20Karpathy-purple)
+
+|                       | Naive multi-agent | LangGraph / CrewAI | **Abelian**                        |
+|---|---|---|---|
+| Peer falsification    | None              | Optional           | **Mandated (rule #18)**            |
+| Termination           | Round budget      | Round budget       | **Mechanism-converge (rule #6)**   |
+| Self-judge bias       | Unaddressed       | Unaddressed        | **Schema-grounded (rule #8 v2.2)** |
+| Stuck → next move     | Manual            | Manual             | **Frame-break Protocol (5-step)**  |
+| Receipts in real runs | —                 | —                  | **6 gate-catches / 1 skill shipped** |
+
+> Your multi-agent LLM team agrees because they're trained on the same data. We made them falsify each other instead. **18** INVARIANTS, **mechanism-converge** termination, **schema-grounded** self-judge, **5-step** Frame-break Protocol. The discipline we run on our own research — and ship the receipts.
 
 ```
 ═══════════════════════════════════════════════════════════════
@@ -18,6 +28,14 @@
 ```
 
 What you see above is one real abelian round. Two peers, two diffs, cross-attack, champion. Output = tractable doc + testable metric. Tasks without testable metric → use `ce-brainstorm`.
+
+## What's inside
+
+- **Asymmetric peer discipline** (rule #18) — PROPOSE mode innovates + grounds; COUNTER mode strictly probes (each attack converts to a runnable PASS/FAIL probe; argumentation without falsification target is forbidden).
+- **Attack Class Libraries** — default-7 + 4 named domain libraries (`research-class` / `audit-class` / `decision-class` / `doc-class`); cite by name in program.md, non-code tasks must opt into ≥1.
+- **Portfolio mode** (K > 1) — MAP-Elites-style Quality-Diversity. Objective shifts from "optimize one" to **"fill cells"** across behavior axes.
+- **Eval Discipline hierarchy** — level 1 (shell number) > level 2 (test pass/fail) > level 3 (frozen rubric self-judge) > level 4 (vibes — refused). Self-judge requires schema-grounding (rule #8 v2.2).
+- **Goal-authoring stage** (rule #17) — `abelian --mission "<fuzzy text>"` runs a 5-pass compiler from fuzzy mission to rule #16-compliant program.md draft.
 
 ## TL;DR
 
@@ -194,6 +212,13 @@ python3 bench.py | tail -1
 Default peers auto-detected from driver (`claude+claude` Claude Code; `codex+codex` codex CLI). Cross-family `claude+codex`, search shape (chains/depth/candidates/portfolio), code-review supplemental — all declared in program.md (no CLI flags). Fuzzy mission: `abelian --mission "<text>"`. Mechanism-based termination per rule #6 (no rounds/budget/wallclock cap). Manual abort: SIGINT. Legacy v2.x flags deprecated → see [MIGRATION.md](MIGRATION.md).
 
 Progress is direction-normalized: `max` metrics improve when they rise; `min` metrics improve when they fall. Champion selection and frame-break gates use `progress_delta`, not raw metric delta.
+
+## Receipts (what abelian has actually shipped)
+
+- **viral-gtm-ai-startup v1.1.0** — operator-grade launch playbook (https://github.com/Abel-ai-causality/viral-gtm-ai-startup). **138** candidate frameworks surveyed → **25** root-essential principle anchors + **12** institutional VC canon refs. Mock-equip walkthrough passed 8/8 mechanical gates. Built via 2 chained abelian runs (`docs/solutions/skills/viral-gtm-ai-startup-build-2026-05-13.md` chained from `viral-gtm-ai-startup-refine-2026-05-13.md`).
+- **6 mechanical bugs caught at round-0 gates** during those runs — including fabricated citations (`First Round "Beyond Disruption"` wasn't a real article; `a16z16z.com` was a typo and the article title didn't resolve), `grep -c` line-hits-vs-distinct-count probe drift, and stale-reference holdovers in rubric thresholds. Each catch is in the run's `program-peer-challenge-v{N}.txt` artifact.
+- **Polymarket alpha research, Round 1 (2026-04-22)** — 2 BLOCKER typos that self-judged 4/4 clean were immediately caught by codex SQL schema-grounding. The exact failure mode that motivated rule #8 v2.2 (schema-grounding required for self-judge).
+- **Compound docs auto-shipped** to `docs/solutions/` on every termination. Each run starts where the last one ended — `docs/solutions/<category>/<goal-slug>-<date>.md`.
 
 ## Roadmap
 
