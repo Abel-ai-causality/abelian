@@ -289,19 +289,99 @@ This applies to:
 
 ## 9. Execution gate (termination requirement)
 
-Termination requires at least one round per cell produced an artifact
-that:
+Termination requires that at least one round per cell produced an artifact that survived an execution gate. The default gate is REAL EXECUTION:
 
-1. Was actually executed in this loop (level 1 or 2 eval — shell
-   number or test-suite, not self-judge).
+1. Artifact was executed in this loop with level 1 or 2 eval (rule #8 hierarchy: shell number / test pass-fail).
 2. Eval at execution time was deterministic non-LLM.
-3. Adversary saw the execution output, not just the spec or diff.
+3. Peer saw execution output (stdout / exit code / file diff), not just spec or diff.
 
-Adversary-exhaustion alone is necessary but not sufficient. Two LLMs
-reaching mutual silence on a spec-only target ≠ artifact survived
-real execution. Doc-only mode requires explicit
-`termination_requires_execution_gate: false` + a downstream-confirmation
-step.
+For task classes with executable artifacts (`code`, `data-pipeline`, `infra`), real execution is the only valid gate. Self-judge eval alone (level 3) does NOT satisfy rule #9 for code-shaped targets.
+
+### Doc-only opt-out (v4.0)
+
+Doc-shaped targets (`doc`, `research`, `audit`, `decision`) often have no executable artifact to run at termination time. These programs MAY opt out of real execution by declaring in program.md:
+
+```
+termination_requires_execution_gate: false
+```
+
+When set, the program MUST also include a `## Mock-equip scenarios` section with at least 3 scenarios. v4.0 makes the doc-only path EXPLICIT: a Mock-Equip Walkthrough is required as downstream-confirmation evidence. The historical vague "downstream-confirmation step" wording (v3.x) is no longer accepted.
+
+Mock-equip is positioned as **degraded-mode execution evidence**, not a third LLM judge. The point: when no real downstream consumer is reachable at termination time (research outputs intended for later action; one-shot decisions; human-consumed docs), mock-equip produces structured friction evidence with line-cited mechanical checks. It does not replace real execution — it stands in for real execution when real execution is structurally unavailable.
+
+### Mock-Equip Walkthrough protocol
+
+After champion selection and BEFORE termination, the orchestrator:
+
+1. **Clears mental state** of seed-context, refined-proposal, program.md, peer proposals, and prior round discussion. Treat as fresh.
+2. **Loads ONLY the champion artifact** at the resolved path from rule #19 (or champion.artifact_path if no upstream dependency).
+3. **Mentally invokes the artifact** on each scenario declared in program.md `## Mock-equip scenarios`, in sequence.
+4. For each scenario, walks the artifact's prescribed procedure step-by-step.
+5. At each step, logs:
+   - Is the next action unambiguous? (yes/no)
+   - Did the artifact point to specific content that can be located by line? (yes/no — friction-MAJOR if reference is broken)
+   - Would clarifying questions or guessing be required? (yes/no — friction-BLOCKER if guessing required)
+   - Is any internal cross-reference traceable? (yes/no — friction-BLOCKER if missing)
+6. **Writes structured trace** to `$RUN_DIR/downstream-confirmation/mock-equip-trace.md`.
+
+Each friction entry MUST contain:
+
+```
+- friction_severity: BLOCKER|MAJOR|MINOR
+  step: <procedure step in champion artifact>
+  issue: <concrete problem in 1 line>
+  skill_line_cited: <integer line number in champion artifact>
+```
+
+**Line-cite is HARD-REQUIRED.** Any friction entry missing `skill_line_cited: <integer>` is auto-rejected — replace it with a properly-cited entry or remove it. Aesthetic / "feels off" / "could be clearer" friction without a line cite has no place in mock-equip output (rule #14 doc-task criterion-4 inherited).
+
+Severity definitions:
+
+- **BLOCKER**: guessing required, missing required content, or untraceable internal cross-reference. The artifact cannot complete the procedure on this scenario without external information.
+- **MAJOR**: broken reference, materially ambiguous but recoverable action, or local cross-reference resolves to wrong content. The artifact CAN complete but with a known correctable defect.
+- **MINOR**: local friction that doesn't block scenario execution. Cosmetic, redundant, or non-critical ambiguity.
+
+### Mock-Equip pass criteria
+
+All 8 checks must pass for goal-met termination on a doc-only target:
+
+1. `[[ -f $RUN_DIR/downstream-confirmation/mock-equip-trace.md ]]`
+2. `grep -cE '^## Scenario' mock-equip-trace.md == N`, where N is declared scenario count and N >= 3.
+3. Per-scenario friction-section binding: each `^## Scenario` header is followed by `^### Friction Points` subsection (use `awk` to bind).
+4. BLOCKER count == 0: `grep -cE '^- friction_severity: BLOCKER' mock-equip-trace.md`.
+5. MAJOR count <= `ceil(N * 2/3)` (so N=3 → ≤2 MAJOR; N=4 → ≤3; N=6 → ≤4).
+6. MINOR count <= N * 2 (so N=3 → ≤6 MINOR; tolerates noise but caps it).
+7. Line-cite count == friction count: `grep -cE '^  skill_line_cited:' == grep -cE '^- friction_severity:'`.
+8. `grep -cE '^## Summary$' mock-equip-trace.md == 1` (a Summary section with explicit BLOCKER/MAJOR/MINOR totals).
+
+Any failure → mock-equip blocks goal-met termination. Next action is another round that repairs the champion artifact OR a tightened program.md (e.g., remove ambiguous scenarios that don't fit the artifact's scope).
+
+### Forbidden mock-equip patterns
+
+Failures of the mock-equip protocol that do not satisfy rule #9 even if all 8 checks pass:
+
+- **Vibes-scoring**: friction entries that read as opinion ("this section feels off") without a line cite. Caught by check 7.
+- **Champion-built-by-walker**: orchestrator did not clear mental state and is implicitly drawing on prior round discussion to fill scenario gaps. Mitigation: scenarios should be CHOSEN to expose content NOT in prior round's frame (e.g., scenarios that substitute different `[product]` placeholders). If all scenarios are minor variants of the same case, mock-equip degrades to self-judge.
+- **Cherry-picked scenarios**: scenarios chosen to flatter the champion. Mitigation: program.md should declare scenario selection rationale; reviewer-side spot-check during commit-gate.
+
+### v4.0 grace period
+
+Existing v3.x programs with `termination_requires_execution_gate: false` and no `## Mock-equip scenarios` section receive a LOUD TERMINATION WARNING in v4.0:
+
+```
+WARNING [v4.0]: doc-only target without ## Mock-equip scenarios.
+v4.0 termination accepted with warning + escalations.md note.
+v4.1 makes this hard gate-fail.
+Migration path: add 3+ scenarios per program.md template, re-run with mock-equip walkthrough.
+```
+
+v4.1 (planned): same condition becomes `gate-failed-terminal: doc-only-without-mock-equip`. Migration must complete before v4.1 release.
+
+### Real-run evidence (v4.0 protocol was pre-validated)
+
+run 2026-05-13-1958 used mock-equip on viral-gtm-ai-startup SKILL.md champion. 3 scenarios walked (abel-mcp launch / Decision Token new vertical / abel-graph-computer release). Results: 0 BLOCKER, 0 MAJOR, 4 MINOR. All 8 mechanical pass criteria satisfied. Trace at `runs/2026-05-13-1958/downstream-confirmation/mock-equip-trace.md`. v4.0 formalizes that ad-hoc protocol into rule #9 doc-only path.
+
+**Rationale (v4.0)**: rule #9's historical doc-only opt-out was a loophole — "downstream-confirmation step" was undefined, so any doc-only target could claim termination without producing falsifiable evidence. v4.0 closes the loophole by REQUIRING a structured mock-equip trace with 8 mechanical pass criteria. The trace is line-cited, severity-tiered, and line-cite-hard-rejection-enforced. It does not substitute for real execution where real execution is possible — it stands in for it where real execution is structurally unavailable (research / decision / human-doc artifacts).
 
 ## 10. Production-runtime safety
 
