@@ -592,7 +592,7 @@ cite | program.md:42 | "First Round 'Beyond Disruption'" | curl <first-round-sea
 probe | program.md:67 | ">=30 distinct = 50% of 61" | grep -oE 'https?://[^ )]+|ISBN[-0-9: ]+' refined-proposal.md | sort -u | wc -l | 61 | PASS
 ```
 
-Headers exact, rows tab-separated or pipe-separated (be consistent within a single run). File is mandatory; missing file blocks rule #2 commit-gate downstream.
+Headers exact, rows tab-separated or pipe-separated (be consistent within a single run). File is mandatory; missing file blocks round-0 completion and launch into round 1.
 
 #### Extension to rule #16 D (Program-peer-challenge)
 
