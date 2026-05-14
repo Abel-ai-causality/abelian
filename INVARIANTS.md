@@ -753,12 +753,12 @@ Rule #11 nonce-header friction defense applies.
 
 program.md MAY declare `Depends on: <RUN_ID>` when the current run builds on a prior abelian champion. When present, the dependency is hard — not advisory context. Before rule #16 starts, the orchestrator MUST verify:
 
-1. `$SKILL_DIR/runs/<RUN_ID>/` directory exists.
-2. `$SKILL_DIR/runs/<RUN_ID>/state.json` parses as valid JSON.
+1. `abelian/runs/<RUN_ID>/` directory exists.
+2. `abelian/runs/<RUN_ID>/state.json` parses as valid JSON.
 3. Prior state has top-level `status: "completed"`.
 4. Prior state has EXACTLY ONE top-level `champion` object (not inside `rounds[]`). Multiple top-level `champion` keys → use migration heuristic below.
 5. Prior `champion.artifact_path` field is present and non-empty (canonical schema below).
-6. The resolved champion artifact path exists on disk at `runs/<RUN_ID>/<artifact_path>`.
+6. The resolved champion artifact path exists on disk at `abelian/runs/<RUN_ID>/<artifact_path>`.
 7. The resolved path is INSIDE the prior run directory (no `..` escape).
 8. The resolved artifact file is non-empty.
 
@@ -790,7 +790,7 @@ On success, current state.json gains:
 "prior_run_dependency": {
   "depends_on": "<RUN_ID>",
   "verified_at": "<ISO-8601>",
-  "champion_path_resolved": "runs/<RUN_ID>/<artifact_path>",
+  "champion_path_resolved": "abelian/runs/<RUN_ID>/<artifact_path>",
   "champion_artifact_sha256": "<hash-at-verification-time>"
 }
 ```
@@ -805,7 +805,7 @@ When `prior_run_dependency` is populated, mission_thread `candidate_routes[]` MA
 "grounding": {
   "source": "prior_run.champion",
   "depends_on": "<RUN_ID>",
-  "path": "runs/<RUN_ID>/<artifact_path>",
+  "path": "abelian/runs/<RUN_ID>/<artifact_path>",
   "sha256": "<verify-time-hash>"
 }
 ```
@@ -817,14 +817,14 @@ The route still must cite an exact champion file path. `prior_run.champion` does
 When `prior_run_dependency` is populated, the auto-compound doc MAY add a top-level header before the locked "What worked" field:
 
 ```markdown
-**Chained from**: runs/<RUN_ID>/<artifact_path>
+**Chained from**: abelian/runs/<RUN_ID>/<artifact_path>
 **Verify-time hash**: <sha256>
 **Verified at**: <ISO-8601>
 ```
 
 ### Migration (v3.x → v3.1, archived runs with duplicate-champion-key bug)
 
-Archived state.json files written before v3.1 may contain duplicate top-level `champion` keys (one near top, one after `rounds[]`). Symptom: `jq -r '.champion' state.json` returns `null` despite a champion object existing earlier. Real-run evidence: `runs/2026-05-13-1832/state.json` and `runs/2026-05-13-1958/state.json` both exhibit this.
+Archived state.json files written before v3.1 may contain duplicate top-level `champion` keys (one near top, one after `rounds[]`). Symptom: `jq -r '.champion' state.json` returns `null` despite a champion object existing earlier. Real-run evidence: `abelian/runs/2026-05-13-1832/state.json` and `abelian/runs/2026-05-13-1958/state.json` both exhibit this.
 
 Migration heuristic at rule #19 resolution time:
 
