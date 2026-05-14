@@ -48,7 +48,7 @@ The v2.17 rule #16 A exception (`Strategy=1 IFF single-axis triage AND --mode=un
 
 v4.0 rewrites rule #9 doc-only opt-out path. Existing v3.x programs that set `termination_requires_execution_gate: false` must migrate.
 
-**For programs with executable targets (`code`, `data-pipeline`, `infra`)**: no migration required. Real execution (level 1-2 eval, deterministic non-LLM, peer saw output) remains the default gate.
+**For programs with executable targets (typically task class `code`, or `mixed` when the champion is runnable)**: no migration required. Real execution (level 1-2 eval, deterministic non-LLM, peer saw output) remains the default gate.
 
 **For doc-only programs (`doc`, `research`, `audit`, `decision`) declaring `termination_requires_execution_gate: false`**:
 
@@ -77,4 +77,4 @@ Migration path: add 3+ scenarios per program.md template, re-run with mock-equip
 
 **v4.1 (planned)**: same condition becomes hard `gate-failed-terminal: doc-only-without-mock-equip`. Migrate before v4.1.
 
-**Reference implementation**: `runs/2026-05-13-1958/program.md` (the ad-hoc precedent) + `runs/2026-05-13-1958/downstream-confirmation/mock-equip-trace.md` (the trace artifact). v4.0 formalizes this pattern into rule #9.
+**Reference implementation**: `abelian/runs/2026-05-13-1958/program.md` (the ad-hoc precedent) + `abelian/runs/2026-05-13-1958/downstream-confirmation/mock-equip-trace.md` (the trace artifact). v4.0 formalizes this pattern into rule #9.

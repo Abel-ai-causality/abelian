@@ -295,7 +295,7 @@ Termination requires that at least one round per cell produced an artifact that 
 2. Eval at execution time was deterministic non-LLM.
 3. Peer saw execution output (stdout / exit code / file diff), not just spec or diff.
 
-For task classes with executable artifacts (`code`, `data-pipeline`, `infra`), real execution is the only valid gate. Self-judge eval alone (level 3) does NOT satisfy rule #9 for code-shaped targets.
+For executable artifacts (typically task class `code`, or `mixed` when the champion is runnable), real execution is the only valid gate. Self-judge eval alone (level 3) does NOT satisfy rule #9 for code-shaped targets.
 
 ### Doc-only opt-out (v4.0)
 
@@ -379,7 +379,7 @@ v4.1 (planned): same condition becomes `gate-failed-terminal: doc-only-without-m
 
 ### Real-run evidence (v4.0 protocol was pre-validated)
 
-run 2026-05-13-1958 used mock-equip on viral-gtm-ai-startup SKILL.md champion. 3 scenarios walked (abel-mcp launch / Decision Token new vertical / abel-graph-computer release). Results: 0 BLOCKER, 0 MAJOR, 4 MINOR. All 8 mechanical pass criteria satisfied. Trace at `runs/2026-05-13-1958/downstream-confirmation/mock-equip-trace.md`. v4.0 formalizes that ad-hoc protocol into rule #9 doc-only path.
+run 2026-05-13-1958 used mock-equip on viral-gtm-ai-startup SKILL.md champion. 3 scenarios walked (abel-mcp launch / Decision Token new vertical / abel-graph-computer release). Results: 0 BLOCKER, 0 MAJOR, 4 MINOR. All 8 mechanical pass criteria satisfied. Trace at `abelian/runs/2026-05-13-1958/downstream-confirmation/mock-equip-trace.md`. v4.0 formalizes that ad-hoc protocol into rule #9 doc-only path.
 
 **Rationale (v4.0)**: rule #9's historical doc-only opt-out was a loophole — "downstream-confirmation step" was undefined, so any doc-only target could claim termination without producing falsifiable evidence. v4.0 closes the loophole by REQUIRING a structured mock-equip trace with 8 mechanical pass criteria. The trace is line-cited, severity-tiered, and line-cite-hard-rejection-enforced. It does not substitute for real execution where real execution is possible — it stands in for it where real execution is structurally unavailable (research / decision / human-doc artifacts).
 

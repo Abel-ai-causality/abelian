@@ -491,7 +491,7 @@ Headline of any user-facing summary MUST be the verbatim first sentence of "What
 
 ### Execution Gate (rule #9)
 
-Default termination requires real execution: at least one round per cell with deterministic non-LLM eval (level 1-2 per rule #8 hierarchy: shell number or test pass-fail), and peers saw execution output. For executable targets (`code`, `data-pipeline`, `infra`), this is the only valid gate.
+Default termination requires real execution: at least one round per cell with deterministic non-LLM eval (level 1-2 per rule #8 hierarchy: shell number or test pass-fail), and peers saw execution output. For executable targets (typically task class `code`, or `mixed` when the champion is runnable), this is the only valid gate.
 
 **Doc-only target** (`doc`, `research`, `audit`, `decision`): declare `termination_requires_execution_gate: false` AND provide `## Mock-equip scenarios:` with at least 3 scenarios. After champion selection, the orchestrator clears prior context, loads ONLY the champion artifact, walks each scenario step-by-step, and writes `downstream-confirmation/mock-equip-trace.md`.
 
