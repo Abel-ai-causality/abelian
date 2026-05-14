@@ -498,11 +498,17 @@ CE-compatible YAML frontmatter (`title`, `date`, `category`, `module`, `problem_
 
 Headline of any user-facing summary MUST be the verbatim first sentence of "What worked" — no paraphrase. Future `abelian program.md` runs on same target search `docs/solutions/` first; load prior compound doc into Strategy + Cells before starting. **Each run starts where the last one ended.**
 
-## Execution Gate — rule #9
+### Execution Gate (rule #9)
 
-Termination requires an executed artifact: ≥1 round per cell with deterministic non-LLM eval (level 1-2: shell number / test pass-fail) where the peer saw the execution output. Two peers reaching mutual silence on a SPEC ≠ artifact surviving real execution.
+Default termination requires real execution: at least one round per cell with deterministic non-LLM eval (level 1-2 per rule #8 hierarchy: shell number or test pass-fail), and peers saw execution output. For executable targets (typically task class `code`, or `mixed` when the champion is runnable), this is the only valid gate.
 
-Doc-only target: `termination_requires_execution_gate: false` declared + downstream-confirmation step. Default = true.
+**Doc-only target** (`doc`, `research`, `audit`, `decision`): declare `termination_requires_execution_gate: false` AND provide `## Mock-equip scenarios:` with at least 3 scenarios. After champion selection, the orchestrator clears prior context, loads ONLY the champion artifact, walks each scenario step-by-step, and writes `downstream-confirmation/mock-equip-trace.md`.
+
+Mock-equip is positioned as **degraded-mode execution evidence**, not a third LLM judge. It stands in for real execution when real execution is structurally unavailable (research / decision / human-doc artifacts). Each friction entry MUST include `skill_line_cited: <line>` — any entry without a line cite is auto-rejected (vibes-scoring forbidden).
+
+Termination is valid only when all 8 mechanical checks pass on the trace: file exists, ≥3 scenarios, per-scenario friction sections, zero BLOCKERs, bounded MAJOR/MINOR counts (MAJOR ≤ ceil(N×2/3), MINOR ≤ N×2), line-cite count equals friction count, and exactly one Summary section. See INVARIANTS rule #9 for full protocol.
+
+**v4.0 grace**: programs with `termination_requires_execution_gate: false` and no `## Mock-equip scenarios` get a loud WARNING at termination (not hard-fail). v4.1 upgrades the same condition to hard `gate-failed-terminal: doc-only-without-mock-equip`. Migrate before v4.1.
 
 ## Migration
 
