@@ -748,3 +748,92 @@ COUNTER: respond via (a) probe + run + PASS/FAIL — preferred,
 ```
 
 Rule #11 nonce-header friction defense applies.
+
+## 19. Chained-run dependency gate (v3.1)
+
+program.md MAY declare `Depends on: <RUN_ID>` when the current run builds on a prior abelian champion. When present, the dependency is hard — not advisory context. Before rule #16 starts, the orchestrator MUST verify:
+
+1. `$SKILL_DIR/runs/<RUN_ID>/` directory exists.
+2. `$SKILL_DIR/runs/<RUN_ID>/state.json` parses as valid JSON.
+3. Prior state has top-level `status: "completed"`.
+4. Prior state has EXACTLY ONE top-level `champion` object (not inside `rounds[]`). Multiple top-level `champion` keys → use migration heuristic below.
+5. Prior `champion.artifact_path` field is present and non-empty (canonical schema below).
+6. The resolved champion artifact path exists on disk at `runs/<RUN_ID>/<artifact_path>`.
+7. The resolved path is INSIDE the prior run directory (no `..` escape).
+8. The resolved artifact file is non-empty.
+
+Any failure → set current run `status: gate-failed-terminal`, `reason: dependency-not-completed`. Do not run rule #16. Do not infer missing prior artifacts from conversation memory.
+
+### Canonical champion schema (v3.1)
+
+The top-level `champion` object in state.json MUST contain:
+
+```json
+"champion": {
+  "peer": "A" | "B",
+  "artifact_path": "<relative-path-inside-run-dir>",
+  "artifact_kind": "refined-proposal | skill-md | proposal | report | other",
+  "conservative_score": <integer>,
+  "verified_at": "<ISO-8601-timestamp>"
+}
+```
+
+Aliased fields (`refined_proposal_path`, `skill_md_path`, etc.) are ALLOWED for compound-doc readability, but `artifact_path` is the canonical key that rule #19 step 5 resolves. Programs producing only aliased fields without `artifact_path` fail rule #19 step 5.
+
+Only ONE top-level `champion` object per state.json. Multiple top-level `champion` keys → state.json is malformed (archived-schema bug, see Migration section). New v3.1 runs MUST write single canonical champion.
+
+### Successful dependency resolution
+
+On success, current state.json gains:
+
+```json
+"prior_run_dependency": {
+  "depends_on": "<RUN_ID>",
+  "verified_at": "<ISO-8601>",
+  "champion_path_resolved": "runs/<RUN_ID>/<artifact_path>",
+  "champion_artifact_sha256": "<hash-at-verification-time>"
+}
+```
+
+SHA-256 captured at verification time. If the prior artifact is modified after the current run starts, mission_thread or compound doc MAY note the divergence; the dependency gate itself uses verify-time hash as truth-anchor.
+
+### Mission Thread integration (rule #14 extension)
+
+When `prior_run_dependency` is populated, mission_thread `candidate_routes[]` MAY cite `prior_run.champion` as a grounding source:
+
+```json
+"grounding": {
+  "source": "prior_run.champion",
+  "depends_on": "<RUN_ID>",
+  "path": "runs/<RUN_ID>/<artifact_path>",
+  "sha256": "<verify-time-hash>"
+}
+```
+
+The route still must cite an exact champion file path. `prior_run.champion` does NOT replace grounding — it is an additional grounding-source class with built-in provenance verification.
+
+### Auto-Compound integration
+
+When `prior_run_dependency` is populated, the auto-compound doc MAY add a top-level header before the locked "What worked" field:
+
+```markdown
+**Chained from**: runs/<RUN_ID>/<artifact_path>
+**Verify-time hash**: <sha256>
+**Verified at**: <ISO-8601>
+```
+
+### Migration (v3.x → v3.1, archived runs with duplicate-champion-key bug)
+
+Archived state.json files written before v3.1 may contain duplicate top-level `champion` keys (one near top, one after `rounds[]`). Symptom: `jq -r '.champion' state.json` returns `null` despite a champion object existing earlier. Real-run evidence: `runs/2026-05-13-1832/state.json` and `runs/2026-05-13-1958/state.json` both exhibit this.
+
+Migration heuristic at rule #19 resolution time:
+
+1. Parse state.json. If `jq .champion` returns null AND there are multiple top-level `champion` keys (depth 1, not inside `rounds[]`), the file has the duplicate-key bug.
+2. Take the FIRST top-level `champion` object (chronologically written first in the file). If that object contains a non-null `artifact_path` field, use it as canonical.
+3. If neither champion has `artifact_path`, infer from aliased fields in this priority order: `refined_proposal_path` → `skill_md_path` → `proposal_path` → first non-null path-shaped field that exists on disk.
+4. Emit warning to current run's `escalations.md`: `archived-champion-schema-migrated: <RUN_ID> via <which-heuristic-rule>`.
+5. Continue rule #19 steps 6-8 against the resolved path.
+
+New v3.1 runs MUST write only ONE top-level `champion` with the canonical schema. The loop driver enforces this on every state.json mutation. Duplicate-key writes in new runs → driver refuses to write (this is orchestrator-side discipline, not a runtime gate).
+
+**Rationale (v3.1)**: chained runs are real (viral-gtm-ai-startup build chain: run 2026-05-13-1832 → 2026-05-13-1958). Without a dependency gate, downstream runs can silently consume stale, modified, or fabricated upstream output. Without canonical schema, ad-hoc field names create ambiguity (duplicate `champion` keys actually occurred in archived files; `jq` returns null). v3.1 makes the chain explicit, hash-verified, and persisted; fixes the schema bug for new runs; migrates archived files at resolution time.

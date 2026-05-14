@@ -43,3 +43,24 @@ After 2 minor versions (target: v3.2), legacy `ABELIAN-ADV-v1` acceptance remove
 ## Rule #16 A v3.0 amendment
 
 The v2.17 rule #16 A exception (`Strategy=1 IFF single-axis triage AND --mode=unilateral`) is REVERTED in v3.0. With unilateral mode dropped, single-axis triage now exits at Pass 0 with reroute diagnostic ("Mission is single-axis verification; abelian's diversity engine has no value here. Use a separate review tool."). v3.0 honest exit instead of v2.17's degraded-run-as-abelian.
+
+## v3.x → v3.1 (chained-run dependency gate, archived state schema)
+
+v3.1 introduces rule #19 Chained-run dependency gate and canonical `champion.artifact_path` schema in state.json.
+
+**For programs that do NOT declare `Depends on:`**: no migration required. Behavior unchanged.
+
+**For programs that DO declare `Depends on: <RUN_ID>` consuming a v3.0.x archived run**:
+
+Archived state.json may contain duplicate top-level `champion` keys (a historical schema looseness). Symptom: `jq -r '.champion' state.json` returns `null` even though a champion object exists earlier in the file.
+
+Rule #19 step 4 detects this and applies the migration heuristic (defined in INVARIANTS rule #19 Migration section). Summary:
+
+1. Detect duplicate top-level `champion` keys.
+2. Use the FIRST top-level occurrence (chronologically written first).
+3. Resolve `artifact_path` directly, or fall back to aliased fields (`refined_proposal_path` → `skill_md_path` → first path-shaped non-null field).
+4. Emit warning to current run `escalations.md`: `archived-champion-schema-migrated: <RUN_ID> via <which-heuristic>`.
+
+**New v3.1 runs**: state.json MUST be written with a single top-level `champion` object containing the canonical schema. The loop driver enforces this on every state.json mutation.
+
+**Future migration tool**: a script (`scripts/migrate-archived-state.sh`) MAY be added in a follow-up PR to rewrite archived state.json files into canonical form. Out of scope for v3.1.0.

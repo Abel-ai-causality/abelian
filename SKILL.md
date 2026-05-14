@@ -198,6 +198,14 @@ Run `status`: `running | completed | interrupted | drift-stopped (rule #4) | con
 
 `frame_break_count_consecutive` resets on any round with `champion_progress_delta > 0` OR `blocker_status ∈ {removed, partially}`. Increments on each fired frame-break. Termination via `no-proposal-after-K-frame-breaks` checks against K (default 2).
 
+### Chained-run pattern (v3.1)
+
+program.md MAY declare `Depends on: <RUN_ID>` when the current run builds on a prior abelian champion. Before rule #16, rule #19 verifies the prior run completed, the canonical `champion.artifact_path` is present, the resolved path exists on disk inside the prior run directory, and the artifact is non-empty. Failure is terminal: `gate-failed-terminal: dependency-not-completed`.
+
+On success, current state.json persists `prior_run_dependency = {depends_on, verified_at, champion_path_resolved, champion_artifact_sha256}`. Mission Thread routes (rule #14) MAY cite `prior_run.champion` as a grounding source with built-in provenance. Auto-Compound MAY add `Chained from:` header in the compound doc.
+
+Canonical champion schema (v3.1): top-level `champion` object MUST contain `peer`, `artifact_path`, `artifact_kind`, `conservative_score`, `verified_at`. Aliased fields (`refined_proposal_path`, `skill_md_path`) allowed for readability but `artifact_path` is canonical. Only ONE top-level `champion` object per state.json. Archived runs with duplicate-key bug use migration heuristic at resolution time (see INVARIANTS rule #19 Migration section).
+
 ## Mission Thread per round — rule #14
 
 Every round populates `state.rounds[N].mission_thread` (7 fields) BEFORE commit-gate. Anchors per-round work to goal; closes the gap where `progress_delta` could be 0 round-after-round while attacks landed clean.
