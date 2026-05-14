@@ -131,6 +131,7 @@ Quote-grep + semantic linkage (rule #16 B): Success cites Goal phrase + Metric n
 
 ### Round-0 gate steps (full spec: rule #16)
 
+0. **Pre-flight verification (v3.2)**: resolve each public-frame URL/ISBN citation (30-sec curl or fetch; 1 retry on transient 4xx/5xx) and execute each count/arithmetic probe claimed by the rubric. Failure exits `gate-failed-terminal` as `citation-unresolvable` or `probe-arithmetic-mismatch`. Writes `round-0/preflight-verification.txt`. Cite-override allowed via program.md `cite-override:` field with reason, attacked in step 3.
 1. **Hard checklist** (binary fast-fail): all program.md fields per "What You Need" + Takeaway 3 fields present.
 2. **Baseline eval**: run Eval once on unmutated tree → `round-0/eval.txt`; validate against `Metric.baseline ± Metric.tolerance`. Mismatch → TTY prompt "measured X vs declared Y; accept measured? (y/edit/abort)". Non-TTY → exit `gate-failed-terminal` with edit instructions.
 3. **Program-peer-challenge**: spawn dissect peer with locked attack classes `{c1, c2, c3, c4, d4}` → `round-0/program-peer-challenge.txt` with rule #11 header (`peer: program-gate`). BLOCKER → refuse; MAJOR → stderr + escalations.md.

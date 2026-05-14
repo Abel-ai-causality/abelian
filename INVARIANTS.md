@@ -553,6 +553,55 @@ fabrication; rule #11's nonce-friction defense applies.
 
 Before round 1, run hard checklist + Takeaway-as-derived-contract + measured baseline + file-gated program-peer-challenge + content hash + TTY-aware confirmation. Skipping any step → `status: gate-failed-terminal`.
 
+### A0. Pre-flight verification (v3.2)
+
+Before the hard checklist, run pre-flight verification over public-frame citations and executable/countable rubric probes. Fail cheap before program-peer-challenge spends tokens on a contract with unresolvable authority or inconsistent math.
+
+#### A0.1 Cite verification
+
+For each public-frame citation in program.md (URL or ISBN authority claim), the orchestrator MUST run a 30-second resolve check:
+
+- URL: `curl -I -L --max-time 30 <url>` or equivalent web fetch; HTTP 200-299 = resolved; 3xx-following-to-200 = resolved.
+- ISBN: grep/fetch a known bibliographic source (publisher page, Open Library, Library of Congress) confirming author + title.
+- Exact-title authority claim ("First Round 'Beyond Disruption'", "a16z 'The Commercial Open Source Database Companies'"): the named author/source/title combination must resolve as a real artifact, not a paraphrase or conflation of two real artifacts.
+
+**Transient-failure safeguard**: a single 4xx/5xx/timeout on the FIRST attempt MUST trigger ONE retry after a 5-second wait, with a different user-agent if available. If retry also fails AND the citation has been previously cached as resolved (state.round_0.cite_cache), the cached PASS stands with a `cache-trusted` annotation. Otherwise the citation is unresolved.
+
+**Human-override**: if cite resolution fails but the orchestrator has high-confidence offline evidence (book on shelf, manual verification), program.md MAY include `cite-override: <citation-id> <reason>` to bypass A0.1 for that specific citation. The override is logged in `round-0/preflight-verification.txt` with the reason, and program-peer-challenge MUST attack the override (rule #16 D extension).
+
+Failure -> set `status: gate-failed-terminal`, reason `citation-unresolvable`. Do not run program-peer-challenge.
+
+#### A0.2 Probe arithmetic consistency
+
+For each rubric axis using a probe-derived threshold (`>=N = X% of M`, `N of M`, `all K`, "distinct"/"unique" counted by shell probe), the orchestrator MUST execute the cited probe and confirm:
+
+- If program.md asserts a probe returns N, the actual command output must return N (within rounding tolerance for floats).
+- If program.md says target `>=30 = 50% of 61`, the arithmetic must hold (61 * 0.5 = 30.5 -> >=30 valid; written 50% of 48 would fail).
+- If an axis says "all K", the listed items must count to K.
+- If a rubric says "distinct" or "unique", the probe must count distinct values (`sort -u | wc -l`), not raw line hits (`grep -c`).
+
+Mismatch -> set `status: gate-failed-terminal`, reason `probe-arithmetic-mismatch`. Do not run program-peer-challenge.
+
+#### A0.3 Artifact
+
+Write `$RUN_DIR/round-0/preflight-verification.txt` with one row per citation/probe checked:
+
+```
+kind | source_line | claim | command_or_fetch | observed | verdict
+cite | program.md:42 | "First Round 'Beyond Disruption'" | curl <first-round-search-url> | no article matching title returned | FAIL
+probe | program.md:67 | ">=30 distinct = 50% of 61" | grep -oE 'https?://[^ )]+|ISBN[-0-9: ]+' refined-proposal.md | sort -u | wc -l | 61 | PASS
+```
+
+Headers exact, rows tab-separated or pipe-separated (be consistent within a single run). File is mandatory; missing file blocks round-0 completion and launch into round 1.
+
+#### Extension to rule #16 D (Program-peer-challenge)
+
+The program-peer-challenge phase (existing rule #16 D) MUST execute each cited probe when attacking rubric arithmetic, not just read program.md text. Peer output body MUST include the command run AND the observed result for any probe-attack class. Text-only inspection is invalid for probe-arithmetic claims and fails commit-gate.
+
+Cite-override attacks (when program.md has `cite-override: <id> <reason>`) MUST be addressed by the peer with a grep-able trace either accepting the override (cite a corroborating source) or rejecting it (cite a contradiction). Silent acceptance of overrides is forbidden.
+
+**Rationale (v3.2)**: round-0 peer review catches fuzzy contracts, but mechanical fabrication and count drift should fail before peer dispatch - cheaper, faster, and removes the failure-mode noise from peer attention. Real-run evidence: run 2026-05-13-1832 caught fabricated "First Round 'Beyond Disruption'" only after a v1 program-peer-challenge (~50K tokens); run 2026-05-13-1958 spent 4 of 5 round-0 iterations on probe-arithmetic mismatches that A0.2 would have caught in 30 seconds total.
+
 ### A. Hard checklist (binary, fast-fail)
 
 - **Goal** (≤200 chars, one line) — MUST contain measurable noun (whitelist: `number | percentage | sharpe | recall | runtime | file-count | pass-rate | precision | latency | throughput | bytes | count`). Standalone process verbs forbidden (`improve | better | investigate | explore | study | examine | analyze`).
